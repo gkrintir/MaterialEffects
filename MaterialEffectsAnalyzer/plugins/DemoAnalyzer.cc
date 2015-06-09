@@ -525,51 +525,51 @@ DemoAnalyzer::bookHistosPerDetector()
 {
     //EnergyLosses1D
     int    i_nbins = 200;
-    float  i_range = 1e-2;
+    float  f_range = 1e-2;
     //EnergyLosses2D-PDG binning
     int    i_nbins_PDG = 2*2212;
-    float  range_PDG = 2213;
+    float  f_range_PDG = 2213;
     //EnergyLosses2D-momentum(p) binning
     int    i_nbins_p = 50;
-    float  range_p = 60;
+    float  f_range_p = 60;
     //EnergyLosses2D-specific energy loss(dedx) binning
     int    i_nbins_dedx = 200;    
-    float  range_dedx = 1e-2; //1e-3 (eloss)
+    float  f_range_dedx = 1e-2; //1e-3 (eloss)
     //EnergyLosses2D-thickness(dx) binning
     int    i_nbins_dx = 200; 
-    float  range_dx = 1e-1;
+    float  f_range_dx = 1e-1;
     
     //Detectors
     //Pixel Barrel - 3 different detector
-    bookEnergyLosses1D( histos_PXB_dedx_,  i_nbins, i_range, "PXB", nHistos_PXB_);
-    bookEnergyLossesRelatedInfo2D( histos_PDG_PXB_dedx_, i_nbins_PDG, range_PDG, i_nbins_dedx, range_dedx,"dEdx", "PDG_PXB", nHistos_PXB_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_PXB_dx_, i_nbins_PDG, range_PDG, i_nbins_dx, range_dx, "dx", "PDG_PXB", nHistos_PXB_ );
-    bookEnergyLossesRelatedInfo2D( histos_p_PXB_dedx_, i_nbins_p, range_p, i_nbins_dedx, range_dedx, "dEdx", "p_PXB", nHistos_PXB_ );
+    bookEnergyLosses1D( histos_PXB_dedx_,  i_nbins, f_range, "PXB", nHistos_PXB_);
+    bookEnergyLossesRelatedInfo2D( histos_PDG_PXB_dedx_, i_nbins_PDG, f_range_PDG, i_nbins_dedx, f_range_dedx,"dEdx", "PDG_PXB", nHistos_PXB_ );
+    bookEnergyLossesRelatedInfo2D( histos_PDG_PXB_dx_, i_nbins_PDG, f_range_PDG, i_nbins_dx, f_range_dx, "dx", "PDG_PXB", nHistos_PXB_ );
+    bookEnergyLossesRelatedInfo2D( histos_p_PXB_dedx_, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", "p_PXB", nHistos_PXB_ );
     //Pixel Endcap - 2 different detector
-    bookEnergyLosses1D(histos_PXF_dedx_,  i_nbins, i_range, "PXF", nHistos_PXF_);
-    bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dedx_, i_nbins_PDG, range_PDG, i_nbins_dedx, range_dedx,"dEdx", "PDG_PXF", nHistos_PXF_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dx_, i_nbins_PDG, range_PDG, i_nbins_dx, range_dx,"dx", "PDG_PXF", nHistos_PXF_ );
-    bookEnergyLossesRelatedInfo2D( histos_p_PXF_dedx_, i_nbins_p, range_p, i_nbins_dedx, range_dedx, "dEdx", "p_PXF", nHistos_PXF_ );
+    bookEnergyLosses1D(histos_PXF_dedx_,  i_nbins, f_range, "PXF", nHistos_PXF_);
+    bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dedx_, i_nbins_PDG, f_range_PDG, i_nbins_dedx, f_range_dedx,"dEdx", "PDG_PXF", nHistos_PXF_ );
+    bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dx_, i_nbins_PDG, f_range_PDG, i_nbins_dx, f_range_dx,"dx", "PDG_PXF", nHistos_PXF_ );
+    bookEnergyLossesRelatedInfo2D( histos_p_PXF_dedx_, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", "p_PXF", nHistos_PXF_ );
     //TIB - 4 different detectors
-    bookEnergyLosses1D( histos_TIB_dedx_, i_nbins, i_range, "TIB", nHistos_TIB_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_TIB_dedx_, i_nbins_PDG, range_PDG, i_nbins_dedx, range_dedx,"dEdx", "PDG_TIB", nHistos_TIB_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_TIB_dx_, i_nbins_PDG, range_PDG, i_nbins_dx, range_dx,"dx", "PDG_TIB", nHistos_TIB_ );
-    bookEnergyLossesRelatedInfo2D( histos_p_TIB_dedx_, i_nbins_p, range_p, i_nbins_dedx, range_dedx, "dEdx", "p_TIB", nHistos_TIB_ );
+    bookEnergyLosses1D( histos_TIB_dedx_, i_nbins, f_range, "TIB", nHistos_TIB_ );
+    bookEnergyLossesRelatedInfo2D( histos_PDG_TIB_dedx_, i_nbins_PDG, f_range_PDG, i_nbins_dedx, f_range_dedx,"dEdx", "PDG_TIB", nHistos_TIB_ );
+    bookEnergyLossesRelatedInfo2D( histos_PDG_TIB_dx_, i_nbins_PDG, f_range_PDG, i_nbins_dx, f_range_dx,"dx", "PDG_TIB", nHistos_TIB_ );
+    bookEnergyLossesRelatedInfo2D( histos_p_TIB_dedx_, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", "p_TIB", nHistos_TIB_ );
     // TOB - 6 different detectors
-    bookEnergyLosses1D( histos_TOB_dedx_, i_nbins, i_range, "TOB", nHistos_TOB_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_TOB_dedx_, i_nbins_PDG, range_PDG, i_nbins_dedx, range_dedx, "dEdx", "PDG_TOB", nHistos_TOB_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_TOB_dx_, i_nbins_PDG, range_PDG, i_nbins_dx, range_dx, "dx", "PDG_TOB", nHistos_TOB_ );
-    bookEnergyLossesRelatedInfo2D( histos_p_TOB_dedx_, i_nbins_p, range_p, i_nbins_dedx, range_dedx, "dEdx", "p_TOB", nHistos_TOB_ );
+    bookEnergyLosses1D( histos_TOB_dedx_, i_nbins, f_range, "TOB", nHistos_TOB_ );
+    bookEnergyLossesRelatedInfo2D( histos_PDG_TOB_dedx_, i_nbins_PDG, f_range_PDG, i_nbins_dedx, f_range_dedx, "dEdx", "PDG_TOB", nHistos_TOB_ );
+    bookEnergyLossesRelatedInfo2D( histos_PDG_TOB_dx_, i_nbins_PDG, f_range_PDG, i_nbins_dx, f_range_dx, "dx", "PDG_TOB", nHistos_TOB_ );
+    bookEnergyLossesRelatedInfo2D( histos_p_TOB_dedx_, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", "p_TOB", nHistos_TOB_ );
     // TID - 3 different detectors
-    bookEnergyLosses1D( histos_TID_dedx_, i_nbins, i_range, "TID", nHistos_TID_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_TID_dedx_, i_nbins_PDG, range_PDG, i_nbins_dedx, range_dedx,"dEdx", "PDG_TID", nHistos_TID_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_TID_dx_, i_nbins_PDG, range_PDG, i_nbins_dx, range_dx,"dx", "PDG_TID", nHistos_TID_ );
-    bookEnergyLossesRelatedInfo2D( histos_p_TID_dedx_, i_nbins_p, range_p, i_nbins_dedx, range_dedx, "dEdx", "p_TID", nHistos_TID_ );
+    bookEnergyLosses1D( histos_TID_dedx_, i_nbins, f_range, "TID", nHistos_TID_ );
+    bookEnergyLossesRelatedInfo2D( histos_PDG_TID_dedx_, i_nbins_PDG, f_range_PDG, i_nbins_dedx, f_range_dedx,"dEdx", "PDG_TID", nHistos_TID_ );
+    bookEnergyLossesRelatedInfo2D( histos_PDG_TID_dx_, i_nbins_PDG, f_range_PDG, i_nbins_dx, f_range_dx,"dx", "PDG_TID", nHistos_TID_ );
+    bookEnergyLossesRelatedInfo2D( histos_p_TID_dedx_, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", "p_TID", nHistos_TID_ );
     // TEC - 9 different detectors
-    bookEnergyLosses1D( histos_TEC_dedx_, i_nbins, i_range, "TEC", nHistos_TEC_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_TEC_dedx_, i_nbins_PDG, range_PDG, i_nbins_dedx, range_dedx,"dEdx", "PDG_TEC", nHistos_TEC_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_TEC_dx_, i_nbins_PDG, range_PDG, i_nbins_dx, range_dx,"dx", "PDG_TEC", nHistos_TEC_ );
-    bookEnergyLossesRelatedInfo2D( histos_p_TEC_dedx_, i_nbins_p, range_p, i_nbins_dedx, range_dedx, "dEdx", "p_TEC", nHistos_TEC_ );
+    bookEnergyLosses1D( histos_TEC_dedx_, i_nbins, f_range, "TEC", nHistos_TEC_ );
+    bookEnergyLossesRelatedInfo2D( histos_PDG_TEC_dedx_, i_nbins_PDG, f_range_PDG, i_nbins_dedx, f_range_dedx,"dEdx", "PDG_TEC", nHistos_TEC_ );
+    bookEnergyLossesRelatedInfo2D( histos_PDG_TEC_dx_, i_nbins_PDG, f_range_PDG, i_nbins_dx, f_range_dx,"dx", "PDG_TEC", nHistos_TEC_ );
+    bookEnergyLossesRelatedInfo2D( histos_p_TEC_dedx_, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", "p_TEC", nHistos_TEC_ );
 
 }
 
