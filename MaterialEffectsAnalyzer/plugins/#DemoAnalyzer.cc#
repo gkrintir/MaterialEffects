@@ -373,7 +373,7 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 			   h_Hit_PixelDets_Map_->Fill(theGeomDet->toGlobal((*Hits).localPosition()).z(),
 						      theGeomDet->toGlobal((*Hits).localPosition()).y());
 			   histos_PXB_dedx_[tTopo->pxbLayer(detId)-1]->Fill((*Hits).energyLoss()/f_dx);
-			   histos_PDG_PXB_dedx_[tTopo->pxbLayer(detId)-1]->Fill(abs((*Hits).particleType()), (*Hits).energyLoss()/f_dx);
+			   histos_PDG_PXB_dedx_[tTopo->pxbLayer(detId)-1]->Fill((*Hits).particleType(), (*Hits).energyLoss()/f_dx);
 			   histos_PDG_PXB_dx_[tTopo->pxbLayer(detId)-1]->Fill(abs((*Hits).particleType()), f_dx);
 			   histos_p_PXB_dedx_[tTopo->pxbLayer(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
 			   i_SimHit_Pixels_Multiplicity++;
