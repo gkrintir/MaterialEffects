@@ -54,7 +54,7 @@
 #include <sstream>
 //
 // class declaration
-//
+// migrate to:https://twiki.cern.ch/twiki/bin/viewauth/CMS/ThreadedDQM
 
 class DemoAnalyzer : public edm::EDAnalyzer {
    public:
