@@ -49,6 +49,9 @@
 #include "TH2.h"
 #include "TMath.h"
 #include "TString.h"
+#include <map>
+#include <set>
+#include <sstream>
 //
 // class declaration
 //
@@ -92,17 +95,27 @@ class DemoAnalyzer : public edm::EDAnalyzer {
       edm::Service<TFileService> fs_;
       //Funtions
       void bookHistosPerDetector();
+      void bookHistosPerParticle( const std::string& particles );
       void bookEnergyLosses1D( std::vector<TH1F*>&, int nBins, float range, const TString &det, unsigned int nHistos );
+  
       void bookEnergyLossesRelatedInfo2D( std::vector<TH2F*>&, 
 					  int nBinsX, float rangeX,  int nBinsY, float rangeY, 
 					  const TString &var, const TString &det, unsigned int nHistos );
+  
+      void bookEnergyLossesRelatedInfo2D( std::vector<TH2F*>&,
+					  int nBinsX, float rangeX,  int nBinsY, float rangeY,
+					  const TString &var, const TString &det );
 
+      //Helper Functions
+      void identifyToken(std::set<char> & , const std::string& );
+      void removeWhiteSpaces( std::string &strg );
+  
       // Histograms      
       //Generator Level
       TH1F* h_Genpart_Mother_Pt_;
       TH1F* h_Genpart_Daughter_Pt_;
       
-      //  Simulation Level 
+      // Simulation Level 
       ////SimTrack Class
       TH1F* h_Track_P_;
       TH1F* h_Track_Pt_;
@@ -127,10 +140,13 @@ class DemoAnalyzer : public edm::EDAnalyzer {
       TH2F* h_Hit_StripDets_Multiplicity_Track_P_;
 
       //  Detectors
+      std::map<std::string, int> mp_ndets_;
       ////Pixel Barrel - 3 different detectors
       static const unsigned int nHistos_PXB_ = 3;
       std::vector<TH1F*> histos_PXB_dedx_;
       std::vector<TH2F*> histos_PDG_PXB_dedx_;
+      std::vector<std::vector<TH2F*> > histos_protons_p_dedx_;
+      std::vector<std::vector<TH2F*> > histos_pions_p_dedx_;
       std::vector<TH2F*> histos_PDG_PXB_dx_;
       std::vector<TH2F*> histos_p_PXB_dedx_;
       ////Pixel Endcap - 2 different detectors
@@ -240,7 +256,16 @@ DemoAnalyzer::DemoAnalyzer(const edm::ParameterSet& iConfig):
     h_Hit_StripDets_dedx_Track_P_ = fs_->make<TH2F>("PSimHit_AllStripLayers_dedx_Track_P", ";P;dedx", 640, 0., 100., 240, 0., .01); //ok
     
     bookHistosPerDetector();
-    
+    mp_ndets_.insert(std::pair<std::string,int>("PXB",3));
+    mp_ndets_.insert(std::pair<std::string,int>("PXF",2));
+
+    bookHistosPerParticle("protons:pions");
+    /*
+    // All Pixel Barrel
+    htmp[0] = ibooker.book1D("PXBFull", "Full Pixel Barrel",220,0.,5.5);
+    htmp[1] = ibooker.book1D("PXBFast", "Fast Pixel Barrel",220,0.,5.5);
+    h200.push_back(htmp);
+    */
     processFastSim_ = iConfig.getUntrackedParameter<bool>("processFastSim");
     if (processFastSim_)
         trackerContainers_.push_back(simHitsTag_);
@@ -377,6 +402,14 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 			   histos_PDG_PXB_dx_[tTopo->pxbLayer(detId)-1]->Fill(abs((*Hits).particleType()), f_dx);
 			   histos_p_PXB_dedx_[tTopo->pxbLayer(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
 			   i_SimHit_Pixels_Multiplicity++;
+			   if (abs((*Hits).particleType())==2212)
+			   {  
+			       histos_protons_p_dedx_[0][tTopo->pxbLayer(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
+			   }
+			   else if (abs((*Hits).particleType())==211)
+			   {
+			     histos_pions_p_dedx_[0][tTopo->pxbLayer(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
+			   }
 		       }
 		       else if (isub == static_cast<int>(PixelSubdetector::PixelEndcap)) 
 		       {
@@ -391,6 +424,16 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 			   histos_PDG_PXF_dedx_[tTopo->pxfDisk(detId)-1]->Fill(abs((*Hits).particleType()), (*Hits).energyLoss()/f_dx);
 			   histos_PDG_PXF_dx_[tTopo->pxfDisk(detId)-1]->Fill(abs((*Hits).particleType()), f_dx);
 			   histos_p_PXF_dedx_[tTopo->pxfDisk(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
+			   //if (abs((*Hits).particleTypeOA())==13)histos_protons_p_dedx_[1][tTopo->pxfDisk(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
+			   if (abs((*Hits).particleType())==2212)
+			   {
+                               histos_protons_p_dedx_[1][tTopo->pxfDisk(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
+			   }
+                           else if (abs((*Hits).particleType())==211)
+			   {
+			       histos_pions_p_dedx_[1][tTopo->pxfDisk(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
+			   }
+
 			   i_SimHit_Pixels_Multiplicity++;
 		       }
 		       else if (isub == StripSubdetector::TIB) 
@@ -555,23 +598,67 @@ DemoAnalyzer::bookHistosPerDetector()
     bookEnergyLossesRelatedInfo2D( histos_PDG_TIB_dedx_, i_nbins_PDG, f_range_PDG, i_nbins_dedx, f_range_dedx,"dEdx", "PDG_TIB", nHistos_TIB_ );
     bookEnergyLossesRelatedInfo2D( histos_PDG_TIB_dx_, i_nbins_PDG, f_range_PDG, i_nbins_dx, f_range_dx,"dx", "PDG_TIB", nHistos_TIB_ );
     bookEnergyLossesRelatedInfo2D( histos_p_TIB_dedx_, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", "p_TIB", nHistos_TIB_ );
-    // TOB - 6 different detectors
+    //TOB - 6 different detectors
     bookEnergyLosses1D( histos_TOB_dedx_, i_nbins, f_range, "TOB", nHistos_TOB_ );
     bookEnergyLossesRelatedInfo2D( histos_PDG_TOB_dedx_, i_nbins_PDG, f_range_PDG, i_nbins_dedx, f_range_dedx, "dEdx", "PDG_TOB", nHistos_TOB_ );
     bookEnergyLossesRelatedInfo2D( histos_PDG_TOB_dx_, i_nbins_PDG, f_range_PDG, i_nbins_dx, f_range_dx, "dx", "PDG_TOB", nHistos_TOB_ );
     bookEnergyLossesRelatedInfo2D( histos_p_TOB_dedx_, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", "p_TOB", nHistos_TOB_ );
-    // TID - 3 different detectors
+    //TID - 3 different detectors
     bookEnergyLosses1D( histos_TID_dedx_, i_nbins, f_range, "TID", nHistos_TID_ );
     bookEnergyLossesRelatedInfo2D( histos_PDG_TID_dedx_, i_nbins_PDG, f_range_PDG, i_nbins_dedx, f_range_dedx,"dEdx", "PDG_TID", nHistos_TID_ );
     bookEnergyLossesRelatedInfo2D( histos_PDG_TID_dx_, i_nbins_PDG, f_range_PDG, i_nbins_dx, f_range_dx,"dx", "PDG_TID", nHistos_TID_ );
     bookEnergyLossesRelatedInfo2D( histos_p_TID_dedx_, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", "p_TID", nHistos_TID_ );
-    // TEC - 9 different detectors
+    //TEC - 7 different detectors
     bookEnergyLosses1D( histos_TEC_dedx_, i_nbins, f_range, "TEC", nHistos_TEC_ );
     bookEnergyLossesRelatedInfo2D( histos_PDG_TEC_dedx_, i_nbins_PDG, f_range_PDG, i_nbins_dedx, f_range_dedx,"dEdx", "PDG_TEC", nHistos_TEC_ );
     bookEnergyLossesRelatedInfo2D( histos_PDG_TEC_dx_, i_nbins_PDG, f_range_PDG, i_nbins_dx, f_range_dx,"dx", "PDG_TEC", nHistos_TEC_ );
     bookEnergyLossesRelatedInfo2D( histos_p_TEC_dedx_, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", "p_TEC", nHistos_TEC_ );
 
 }
+
+
+void 
+DemoAnalyzer::bookHistosPerParticle(const std::string& particles)
+{
+
+    //EnergyLosses2D-momentum(p) binning
+    int    i_nbins_p = 50;
+    float  f_range_p = 60;
+    //EnergyLosses2D-specific energy loss(dedx) binning
+    int    i_nbins_dedx = 200;    
+    float  f_range_dedx = 1e-2; //1e-3 (eloss)
+
+    //std::map<std::string,int>::iterator it ;//= mp_ndets_.begin();
+    
+    //
+    std::vector<std::string> n_Pads;
+    std::set<char> token;
+    identifyToken(token, particles);
+    std::istringstream variables_toDraw(particles);
+    std::string variable;
+    while (std::getline(variables_toDraw, variable, (*token.begin()))) {
+      removeWhiteSpaces(variable);
+      n_Pads.push_back(variable);
+    }
+  
+    std::cout<<n_Pads.size()<<std::endl;
+    //
+
+    for (unsigned int i=0; i<n_Pads.size(); ++i) 
+    {
+        for ( auto& x: mp_ndets_)//=mp_ndets_.begin(); it!=mp_ndets_.end(); ++it)
+	{
+	    
+	    std::vector<TH2F*> histos_PDG_PXF_dedx;
+	    std::string strToReturn;
+	    strToReturn.append(x.first);
+	    bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dedx, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", Form("p_%s_%s", strToReturn.data(), n_Pads[i].data()), x.second );
+	    histos_protons_p_dedx_.push_back(histos_PDG_PXF_dedx);
+
+	}
+    }
+}
+
 
 void 
 DemoAnalyzer::bookEnergyLosses1D( std::vector<TH1F*>& histos_det_dedx, int nBins, float range, const TString &det, unsigned int nHistos )
@@ -583,15 +670,73 @@ DemoAnalyzer::bookEnergyLosses1D( std::vector<TH1F*>& histos_det_dedx, int nBins
 }
 
 void 
-DemoAnalyzer:: bookEnergyLossesRelatedInfo2D( std::vector<TH2F*>& histos_PDG_det_dedx, 
-					      int nBinsX, float rangeX, int nBinsY, float rangeY, 
-					      const TString &var, const TString &det, unsigned int nHistos )
+DemoAnalyzer::bookEnergyLossesRelatedInfo2D( std::vector<TH2F*>& histos_PDG_det_dedx, 
+					     int nBinsX, float rangeX, int nBinsY, float rangeY, 
+					     const TString &var, const TString &det, unsigned int nHistos )
 {
     TString x_Axis_Label  = ( (TObjString*) (det.Tokenize("_")->At(0)))->GetString().Data();
     for(unsigned int iHist = 0; iHist < nHistos; iHist++) 
         histos_PDG_det_dedx.push_back( fs_->make<TH2F>(Form( "hist_%s_%u_%s" , det.Data() , iHist+1, var.Data() ) ,
 						       Form( "Sim_Hit_%s_%s_%u;%s;" , var.Data(), det.Data() , iHist+1, x_Axis_Label.Data() ) ,
 						       nBinsX , 0. , rangeX, nBinsY , 0.0 ,  rangeY) );
+
+}
+
+void 
+DemoAnalyzer::bookEnergyLossesRelatedInfo2D( std::vector<TH2F*>& histos_PDG_det_dedx, 
+					     int nBinsX, float rangeX, int nBinsY, float rangeY, 
+					     const TString &var, const TString &det )
+{
+    TString x_Axis_Label  = ( (TObjString*) (det.Tokenize("_")->At(0)))->GetString().Data();
+    int iHist = 0;
+    histos_PDG_det_dedx.push_back( fs_->make<TH2F>(Form( "hist_%s_%u_%s" , det.Data() , iHist+1, var.Data() ) ,
+						   Form( "Sim_Hit_%s_%s_%u;%s;" , var.Data(), det.Data() , iHist+1, x_Axis_Label.Data() ) ,
+						   nBinsX , 0. , rangeX, nBinsY , 0.0 ,  rangeY) );
+    
+}
+
+
+
+void 
+DemoAnalyzer::identifyToken (std::set<char> & token, const std::string& tokenize ) 
+{
+  //Function to automatically identify token used by the user in the string literal
+  //Token could be everything other  a number, i.e. everything with ASCII code outside the [48,57] 
+  //other than a letter, i.e. everything with ASCII code outside the [65,90] and [97,122] range
+  //and other than an underscore, i.e. with ASCII code different than 95
+  for(unsigned int count =0; count < tokenize.size(); count++)
+    if (( (int) tokenize[count]>=48 && (int) tokenize[count]<=57 ) ||
+	( (int) tokenize[count]>=65 && (int) tokenize[count]<=90 ) || 
+	( (int) tokenize[count]>=97 && (int) tokenize[count]<=122 ) ||
+	(int) tokenize[count]==95 ) 
+      
+      continue;
+    else
+      if ( (int) tokenize[count]!=32 )
+	token.insert(tokenize[count]);
+
+  if (token.size()>1) throw "Please define one delimeter at most!";
+}
+
+void 
+DemoAnalyzer::removeWhiteSpaces( std::string &strg ) 
+{  
+  //Function to remove white spaces that accidentally have been added by the user in the string literal
+  int i;
+  i = strg.find("  ");
+  
+  if ( i > -1 )
+    {
+      removeWhiteSpaces (  strg.replace( i,2,"" ) ); //recursive calling of the function itself
+    }
+  else if ( i == -1 )
+    {
+      i = strg.find(" ");
+      if ( i > -1 )
+	{
+	  strg.erase(0,1);
+	}
+    }
 }
 
 //define this as a plug-in

@@ -21,8 +21,8 @@ myfilelist.extend( [line.strip() for line in f.read().splitlines()] )
 process.source = cms.Source("PoolSource",
     # replace 'myfile.root' with the source file you want to use
     fileNames =
-        myfilelist
-        #cms.untracked.vstring(
+        #myfilelist
+        cms.untracked.vstring(
         #FullSim Samples (locally)
         #'file:/afs/cern.ch/user/g/gkrintir/github/GenSim/CMSSW_7_3_0/src/mygun_ppions_FULLSIM_GENSIM.root'
         
@@ -31,20 +31,20 @@ process.source = cms.Source("PoolSource",
         #FastSim Samples (locally)
         #'file:/afs/cern.ch/user/g/gkrintir/github/GenSim/CMSSW_7_3_0/src/mygun_muons_FASTSIM_SameFULLSIMConditions.root'
 
-        #'file:/afs/cern.ch/user/g/gkrintir/github/GenSim/CMSSW_7_3_0/src/Generation_Output/FastSim/GENSIM/mygun_muons_FASTSIM_SameFULLSIMConditions_noflatpT.root',
+        'file:/afs/cern.ch/user/g/gkrintir/github/GenSim/CMSSW_7_3_0/src/Generation_Output/FastSim/GENSIM/mygun_ppions_FASTSIM_SameFULLSIMConditions_noflatE.root',
         #'file:/afs/cern.ch/user/g/gkrintir/github/GenSim/CMSSW_7_3_0/src/mygun_protons_FASTSIM_SameFULLSIMConditions_noflatpT.root,
         #'file:/afs/cern.ch/user/g/gkrintir/github/GenSim/CMSSW_7_3_0/src/mygun_kaons_FASTSIM_SameFULLSIMConditions_noflatpT.root'
-        #)
+        )
 )
 
 process.validation = cms.EDAnalyzer('DemoAnalyzer', 
-     processFastSim = cms.untracked.bool(False),                               
+     processFastSim = cms.untracked.bool(True),                               
 )
 
 process.GlobalTag.globaltag = 'PHYS14_50_V1'
 
 process.TFileService = cms.Service("TFileService",
-                                   fileName = cms.string('Analysis_mygyn_muons_FULLSIM_GENSIM_noflatpT.root')
+                                   fileName = cms.string('nalysis_mygyn_muons_FASTSIM_SameFULLSIMConditions_noflatpT.root')
                                    )
 
 
