@@ -4,6 +4,7 @@
 <use name="DataFormats/TrackReco"/>
 <use name="DataFormats/HepMCCandidate"/>
 <use name="DataFormats/TrackerCommon"/>
+<use name="DataFormats/Math"/> 
 <use name="SimDataFormats/TrackingHit"/>
 <use name="Geometry/TrackerGeometryBuilder"/>
 <use name="Geometry/Records"/>

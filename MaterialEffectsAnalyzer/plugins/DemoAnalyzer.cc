@@ -39,7 +39,7 @@
 #include "SimDataFormats/Track/interface/SimTrack.h"
 #include "SimDataFormats/Track/interface/SimTrackContainer.h"
 
-#include "DataFormats/Math/interface/Vector3D.h"
+//#include "DataFormats/Math/interface/Vector3D.h"
 #include "Geometry/Records/interface/IdealGeometryRecord.h"
 #include "Geometry/Records/interface/TrackerDigiGeometryRecord.h"
 #include "Geometry/TrackerGeometryBuilder/interface/TrackerGeometry.h"
@@ -47,7 +47,7 @@
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
 
 #include "TH2.h"
-#include "TMath.h"
+//#include "TMath.h"
 #include "TString.h"
 #include <map>
 #include <set>
