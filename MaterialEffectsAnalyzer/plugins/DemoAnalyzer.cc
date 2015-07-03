@@ -4,9 +4,7 @@
 // Class:      DemoAnalyzer
 // 
 /**\class DemoAnalyzer DemoAnalyzer.cc Analyzer/DemoAnalyzer/plugins/DemoAnalyzer.cc
-
  Description: [one line class summary]
-
  Implementation:
      [Notes on implementation]
 */
@@ -31,6 +29,7 @@
 
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 
+
 #include "DataFormats/TrackReco/interface/Track.h"
 #include "DataFormats/TrackReco/interface/TrackFwd.h"
 #include "DataFormats/TrackerCommon/interface/TrackerTopology.h"
@@ -52,9 +51,10 @@
 #include <map>
 #include <set>
 #include <sstream>
+
 //
 // class declaration
-//
+// migrate to:https://twiki.cern.ch/twiki/bin/viewauth/CMS/ThreadedDQM
 
 class DemoAnalyzer : public edm::EDAnalyzer {
    public:
@@ -653,8 +653,14 @@ DemoAnalyzer::bookHistosPerParticle(const std::string& particles)
 	    std::string strToReturn;
 	    strToReturn.append(x.first);
 	    bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dedx, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", Form("p_%s_%s", strToReturn.data(), n_Pads[i].data()), x.second );
-	    histos_protons_p_dedx_.push_back(histos_PDG_PXF_dedx);
-
+	    if (n_Pads[i].compare("protons")==0)
+	    {
+	        histos_protons_p_dedx_.push_back(histos_PDG_PXF_dedx);
+	    }
+	    else if (n_Pads[i].compare("pions")==0)
+	    {
+		histos_pions_p_dedx_.push_back(histos_PDG_PXF_dedx);
+	    }
 	}
     }
 }
