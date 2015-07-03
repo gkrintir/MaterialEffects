@@ -31,6 +31,7 @@
 
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 
+
 #include "DataFormats/TrackReco/interface/Track.h"
 #include "DataFormats/TrackReco/interface/TrackFwd.h"
 #include "DataFormats/TrackerCommon/interface/TrackerTopology.h"
@@ -39,7 +40,7 @@
 #include "SimDataFormats/Track/interface/SimTrack.h"
 #include "SimDataFormats/Track/interface/SimTrackContainer.h"
 
-//#include "DataFormats/Math/interface/Vector3D.h"
+#include "DataFormats/Math/interface/Vector3D.h"
 #include "Geometry/Records/interface/IdealGeometryRecord.h"
 #include "Geometry/Records/interface/TrackerDigiGeometryRecord.h"
 #include "Geometry/TrackerGeometryBuilder/interface/TrackerGeometry.h"
@@ -47,11 +48,12 @@
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
 
 #include "TH2.h"
-//#include "TMath.h"
+#include "TMath.h"
 #include "TString.h"
 #include <map>
 #include <set>
 #include <sstream>
+
 //
 // class declaration
 // migrate to:https://twiki.cern.ch/twiki/bin/viewauth/CMS/ThreadedDQM
@@ -653,8 +655,14 @@ DemoAnalyzer::bookHistosPerParticle(const std::string& particles)
 	    std::string strToReturn;
 	    strToReturn.append(x.first);
 	    bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dedx, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", Form("p_%s_%s", strToReturn.data(), n_Pads[i].data()), x.second );
-	    histos_protons_p_dedx_.push_back(histos_PDG_PXF_dedx);
-
+	    if (n_Pads[i].compare("protons")==0)
+	    {
+	        histos_protons_p_dedx_.push_back(histos_PDG_PXF_dedx);
+	    }
+	    else if (n_Pads[i].compare("pions")==0)
+	    {
+		histos_pions_p_dedx_.push_back(histos_PDG_PXF_dedx);
+	    }
 	}
     }
 }
