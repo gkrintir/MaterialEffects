@@ -31,11 +31,14 @@ process.source = cms.Source("PoolSource",
         #FastSim Samples (locally)
         #'file:/afs/cern.ch/user/g/gkrintir/github/GenSim/CMSSW_7_3_0/src/mygun_muons_FASTSIM_SameFULLSIMConditions.root'
 
-        'file:/afs/cern.ch/user/g/gkrintir/github/GenSim/CMSSW_7_3_0/src/Generation_Output/FastSim/GENSIM/mygun_ppions_FASTSIM_SameFULLSIMConditions_noflatE.root',
+        'file:/afs/cern.ch/user/g/gkrintir/github/GenSim/CMSSW_7_3_0/src/Generation_Output/FastSim/GENSIM/mygun_ppions_FASTSIM_SameFULLSIMConditions_noflatpT.root',
         #'file:/afs/cern.ch/user/g/gkrintir/github/GenSim/CMSSW_7_3_0/src/mygun_protons_FASTSIM_SameFULLSIMConditions_noflatpT.root,
         #'file:/afs/cern.ch/user/g/gkrintir/github/GenSim/CMSSW_7_3_0/src/mygun_kaons_FASTSIM_SameFULLSIMConditions_noflatpT.root'
         )
 )
+
+# For histograms
+process.load("DQMServices.Core.DQM_cfg")
 
 process.validation = cms.EDAnalyzer('DemoAnalyzer', 
      processFastSim = cms.untracked.bool(True),                               
@@ -43,9 +46,22 @@ process.validation = cms.EDAnalyzer('DemoAnalyzer',
 
 process.GlobalTag.globaltag = 'PHYS14_50_V1'
 
-process.TFileService = cms.Service("TFileService",
-                                   fileName = cms.string('nalysis_mygyn_muons_FASTSIM_SameFULLSIMConditions_noflatpT.root')
-                                   )
+#process.TFileService = cms.Service("TFileService",
+#                                   fileName = cms.string('nalysis_mygyn_muons_FASTSIM_SameFULLSIMConditions_noflatpT.root')
+#                                   )
 
+process.DQMoutput = cms.OutputModule("DQMRootOutputModule",
+                                     fileName = cms.untracked.string("OUT_step1.root"))
 
 process.p = cms.Path(process.validation)
+
+# Path and EndPath definitions
+process.dqmoffline_step = cms.Path(process.validation*process.dqmSaver)
+process.DQMoutput_step = cms.EndPath(process.DQMoutput)
+
+
+# Schedule definition
+process.schedule = cms.Schedule(
+    process.dqmoffline_step,
+    process.DQMoutput_step
+    )
