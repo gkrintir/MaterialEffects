@@ -11,6 +11,7 @@ process.load('Configuration.StandardSequences.Geometry_cff')
 process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_condDBv2_cff')
 process.load("Configuration.StandardSequences.RawToDigi_cff")
 process.load("Configuration.EventContent.EventContent_cff")
+process.load('Configuration.StandardSequences.EDMtoMEAtRunEnd_cff')
 process.load("Configuration.StandardSequences.Reconstruction_cff")
 process.load("Configuration.StandardSequences.MagneticField_cff")
 
@@ -39,6 +40,7 @@ process.source = cms.Source("PoolSource",
 
 # For histograms
 process.load("DQMServices.Core.DQM_cfg")
+process.load("DQMServices.Components.DQMEnvironment_cfi")
 
 process.validation = cms.EDAnalyzer('DemoAnalyzer', 
      processFastSim = cms.untracked.bool(True),                               
@@ -46,22 +48,38 @@ process.validation = cms.EDAnalyzer('DemoAnalyzer',
 
 process.GlobalTag.globaltag = 'PHYS14_50_V1'
 
-#process.TFileService = cms.Service("TFileService",
-#                                   fileName = cms.string('nalysis_mygyn_muons_FASTSIM_SameFULLSIMConditions_noflatpT.root')
-#                                   )
+process.TFileService = cms.Service("TFileService",
+                                   fileName = cms.string('nalysis_mygyn_muons_FASTSIM_SameFULLSIMConditions_noflatpT.root')
+                                   )
 
 process.DQMoutput = cms.OutputModule("DQMRootOutputModule",
                                      fileName = cms.untracked.string("OUT_step1.root"))
 
-process.p = cms.Path(process.validation)
+#process.p = cms.Path(process.validation)
 
 # Path and EndPath definitions
-process.dqmoffline_step = cms.Path(process.validation*process.dqmSaver)
+process.dqmoffline_step = cms.Path(process.validation)
+'''
+process.dqmsave_step = cms.Path(process.DQMSaver)
 process.DQMoutput_step = cms.EndPath(process.DQMoutput)
 
 
 # Schedule definition
 process.schedule = cms.Schedule(
     process.dqmoffline_step,
-    process.DQMoutput_step
+    process.DQMoutput_step,
+    process.dqmsave_step
+    )
+'''
+
+
+process.dqmsave_step = cms.Path(process.DQMSaver)
+process.DQMoutput_step = cms.EndPath(process.DQMoutput)
+
+
+# Schedule definition
+process.schedule = cms.Schedule(
+    process.dqmoffline_step,
+    process.DQMoutput_step,
+    process.dqmsave_step
     )
