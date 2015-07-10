@@ -84,6 +84,9 @@ class DemoAnalyzer : public DQMEDAnalyzer {
 					  int nBinsX, float rangeX,  int nBinsY, float rangeY, 
 					  const TString &var, const TString &det, unsigned int nHistos );
 
+      void bookEnergyLosses1D( std::vector<MonitorElement*>&, DQMStore::IBooker & ibooker, int nBins, float range, 
+			       const TString &det, unsigned int nHistos );
+
       edm::InputTag simHitsTag_;
 
       edm::InputTag simHitsTag_PXB_Lowtof_;
@@ -122,7 +125,7 @@ class DemoAnalyzer : public DQMEDAnalyzer {
       std::vector<std::vector<MonitorElement*> > histos_pions_p_dedx_;
 
       //  Detectors
-      std::map<std::string, int> mp_ndets_;
+      std::map<std::string, int> map_subdet_nlayers_;
   /*
       // Histograms      
       //Generator Level
@@ -154,7 +157,7 @@ class DemoAnalyzer : public DQMEDAnalyzer {
       TH2F* h_Hit_StripDets_Multiplicity_Track_P_;
 
       //  Detectors
-      std::map<std::string, int> mp_ndets_;
+      std::map<std::string, int> map_subdet_nlayers_;
       ////Pixel Barrel - 3 different detectors
       static const unsigned int nHistos_PXB_ = 3;
       std::vector<TH1F*> histos_PXB_dedx_;
@@ -272,8 +275,8 @@ DemoAnalyzer::DemoAnalyzer(const edm::ParameterSet& iConfig):
     h_Hit_StripDets_dedx_Track_P_ = fs_->make<TH2F>("PSimHit_AllStripLayers_dedx_Track_P", ";P;dedx", 640, 0., 100., 240, 0., .01); //ok
     
     bookHistosPerDetector();
-    mp_ndets_.insert(std::pair<std::string,int>("PXB",3));
-    mp_ndets_.insert(std::pair<std::string,int>("PXF",2));
+    map_subdet_nlayers_.insert(std::pair<std::string,int>("PXB",3));
+    map_subdet_nlayers_.insert(std::pair<std::string,int>("PXF",2));
 
     bookHistosPerParticle("protons:pions");
   */
@@ -639,7 +642,7 @@ DemoAnalyzer::bookHistosPerDetector()
 */
 
 void 
-DemoAnalyzer::bookHistosPerParticle(const std::string& particles,  DQMStore::IBooker & ibooker)
+DemoAnalyzer::bookHistosPerParticle(const std::string& str_particles,  DQMStore::IBooker & ibooker)
 {
 
     //EnergyLosses2D-momentum(p) binning
@@ -651,33 +654,36 @@ DemoAnalyzer::bookHistosPerParticle(const std::string& particles,  DQMStore::IBo
 
      
     //
-    std::vector<std::string> n_Pads;
+    std::vector<std::string> vctr_particles;
     std::set<char> token;
-    identifyToken(token, particles);
-    std::istringstream variables_toDraw(particles);
-    std::string variable;
-    while (std::getline(variables_toDraw, variable, (*token.begin()))) {
-      removeWhiteSpaces(variable);
-      n_Pads.push_back(variable);
+    identifyToken(token, str_particles);
+    std::istringstream particles_toDraw(str_particles);
+    std::string s_particle;
+    while (std::getline(particles_toDraw, s_particle, (*token.begin()))) {
+      removeWhiteSpaces(s_particle);
+      vctr_particles.push_back(s_particle);
     }
   
-    std::cout<<n_Pads.size()<<std::endl;
+    std::cout<<vctr_particles.size()<<std::endl;
     //
 
-    for (unsigned int i=0; i<n_Pads.size(); ++i) 
+    for (unsigned int i=0; i<vctr_particles.size(); ++i) 
     {
-        for ( auto& x: mp_ndets_)//=mp_ndets_.begin(); it!=mp_ndets_.end(); ++it)
+        for ( auto& x: map_subdet_nlayers_)//=map_subdet_nlayers_.begin(); it!=map_subdet_nlayers_.end(); ++it)
 	{
 	    
 	    std::vector<MonitorElement*> histos_PDG_PXF_dedx;
-	    std::string strToReturn;
-	    strToReturn.append(x.first);
-	    bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dedx, ibooker, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", Form("p_%s_%s", strToReturn.data(), n_Pads[i].data()), x.second );
-	    if (n_Pads[i].compare("protons")==0)
+	    std::vector<MonitorElement*> histos_PXB_dedx;
+		    
+	    std::string str_subdet; 
+	    str_subdet.append(x.first);
+	    bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dedx, ibooker, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", Form("p_%s_%s", str_subdet.data(), vctr_particles[i].data()), x.second );
+	    //bookEnergyLosses1D( histos_PXB_dedx, ibooker, i_nbins_p, f_range_p, "PXB", nHistos_PXB_);
+	    if (vctr_particles[i].compare("protons")==0)
 	    {
 	        histos_protons_p_dedx_.push_back(histos_PDG_PXF_dedx);
 	    }
-	    else if (n_Pads[i].compare("pions")==0)
+	    else if (vctr_particles[i].compare("pions")==0)
 	    {
 		histos_pions_p_dedx_.push_back(histos_PDG_PXF_dedx);
 	    }
@@ -704,10 +710,11 @@ DemoAnalyzer::bookEnergyLossesRelatedInfo2D( std::vector<MonitorElement*>& histo
     TString x_Axis_Label  = ( (TObjString*) (det.Tokenize("_")->At(0)))->GetString().Data();
     for(unsigned int iHist = 0; iHist < nHistos; iHist++) 
         histos_PDG_det_dedx.push_back( ibooker.book2D(Form( "hist_%s_%u_%s" , det.Data() , iHist+1, var.Data() ) ,
-						       Form( "Sim_Hit_%s_%s_%u;%s;" , var.Data(), det.Data() , iHist+1, x_Axis_Label.Data() ) ,
+						       Form( "SimHit_%s_%s_%u;%s;" , var.Data(), det.Data() , iHist+1, x_Axis_Label.Data() ) ,
 						       nBinsX , 0. , rangeX, nBinsY , 0.0 ,  rangeY) );
 
 }
+
 
 /*
 void 
@@ -731,8 +738,10 @@ void DemoAnalyzer::bookHistograms(DQMStore::IBooker & ibooker, edm::Run const & 
 
      ibooker.cd();
      ibooker.setCurrentFolder("testMaterialEffects");
-     mp_ndets_.insert(std::pair<std::string,int>("PXB",3));
-     mp_ndets_.insert(std::pair<std::string,int>("PXF",2));
+     map_subdet_nlayers_.insert(std::pair<std::string,int>("PXF",2));
+     map_subdet_nlayers_.insert(std::pair<std::string,int>("PXB",3));
+
+
      bookHistosPerParticle("protons:pions", ibooker);
      
 }
@@ -740,8 +749,8 @@ void DemoAnalyzer::bookHistograms(DQMStore::IBooker & ibooker, edm::Run const & 
 void 
 DemoAnalyzer::identifyToken (std::set<char> & token, const std::string& tokenize ) 
 {
-    //Function to automatically identify token used by the user in the string literal
-    //Token could be everything other  a number, i.e. everything with ASCII code outside the [48,57] 
+    //Function to automatically identify token used by the user in the string literal 'tokenize'.
+    //Token could be everything other a number, i.e. everything with ASCII code outside the [48,57] range
     //other than a letter, i.e. everything with ASCII code outside the [65,90] and [97,122] range
     //and other than an underscore, i.e. with ASCII code different than 95
     for(unsigned int count =0; count < tokenize.size(); count++)
