@@ -21,17 +21,23 @@ process.load("Analyzer.MaterialEffectsAnalyzer.DQMExample_Step1_cfi")
 
 
 process.maxEvents = cms.untracked.PSet(
-    input = cms.untracked.int32(200)
+    input = cms.untracked.int32(-1)
 )
+
+f = open('ppions_FULLSIM_GENSIM_05_10.txt', 'r')
+
+myfilelist = cms.untracked.vstring()
+myfilelist.extend( [line.strip() for line in f.read().splitlines()] )
 
 # Input source
 process.source = cms.Source("PoolSource",
     secondaryFileNames = cms.untracked.vstring(),
-    fileNames = cms.untracked.vstring(
+    fileNames = myfilelist
+        #cms.untracked.vstring(
         #reco from relVals
         #'file:/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/datatest/forTutorial/step2_RAW2DIGI_RECO_fromRelValTTbarLepton.root'
-        'file:/afs/cern.ch/user/g/gkrintir/github/GenSim/CMSSW_7_3_0/src/Generation_Output/FastSim/GENSIM/mygun_ppions_FASTSIM_SameFULLSIMConditions_noflatpT.root'
-        )
+        #'file:/afs/cern.ch/user/g/gkrintir/github/GenSim/CMSSW_7_3_0/src/Generation_Output/FastSim/GENSIM/mygun_ppions_FASTSIM_SameFULLSIMConditions_noflatpT.root'
+        #)
 )
 
 process.GlobalTag.globaltag = 'PHYS14_50_V1'
