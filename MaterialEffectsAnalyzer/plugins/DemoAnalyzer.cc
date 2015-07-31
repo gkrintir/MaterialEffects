@@ -375,18 +375,20 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 		       std::set<unsigned int> detIds;
 		       unsigned int detId = (*Hits).detUnitId();
 		       unsigned int isub  = DetId(detId).subdetId();
-		       
+		       /*
 		       float f_dx = TMath::Power(
 						 TMath::Power( (*Hits).entryPoint().x() - (*Hits).exitPoint().x(), 2) + 
 						 TMath::Power( (*Hits).entryPoint().y() - (*Hits).exitPoint().y(), 2) + 
 						 TMath::Power( (*Hits).entryPoint().z() - (*Hits).exitPoint().z(), 2), 
 						 1/2.);
-	     
-	     
+		       */
+		       float f_dx = TMath::Power(TMath::Power( (*Hits).entryPoint().z() - (*Hits).exitPoint().z(), 2), 
+						 1/2.);
+
 		       const DetId& theDetId = (*Hits).detUnitId();
 		       const GeomDet* theGeomDet = theTrackerGeometry->idToDet(theDetId);
 		       // const GlobalPoint& globalPoint = theGeomDet->toGlobal (localPoint); 
-		       //std::cout<< globalPoint.x() <<std::endl;
+		       std::cout<<f_dx <<std::endl;
 	     
 		       if (isub == static_cast<int>(PixelSubdetector::PixelBarrel)) 
 		       {
@@ -397,7 +399,7 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 			   h_Hit_PixelDets_dedx_Track_P_->Fill((*simTrack).momentum().P(), (*Hits).energyLoss()/f_dx);
 			   h_Hit_PixelDets_Map_->Fill(theGeomDet->toGlobal((*Hits).localPosition()).z(),
 						      theGeomDet->toGlobal((*Hits).localPosition()).y());
-			   histos_PXB_dedx_[tTopo->pxbLayer(detId)-1]->Fill((*Hits).energyLoss()/f_dx);
+			   histos_PXB_dedx_[tTopo->pxbLayer(detId)-1]->Fill(f_dx);
 			   histos_PDG_PXB_dedx_[tTopo->pxbLayer(detId)-1]->Fill(abs((*Hits).particleType()), (*Hits).energyLoss()/f_dx);
 			   histos_PDG_PXB_dx_[tTopo->pxbLayer(detId)-1]->Fill(abs((*Hits).particleType()), f_dx);
 			   histos_p_PXB_dedx_[tTopo->pxbLayer(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
@@ -420,7 +422,7 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 			   h_Hit_PixelDets_dedx_Track_P_->Fill((*simTrack).momentum().P(), (*Hits).energyLoss()/f_dx);
 			   h_Hit_PixelDets_Map_->Fill(theGeomDet->toGlobal((*Hits).localPosition()).z(),
 						      theGeomDet->toGlobal((*Hits).localPosition()).y());
-			   histos_PXF_dedx_[tTopo->pxfDisk(detId)-1]->Fill((*Hits).energyLoss()/f_dx);
+			   histos_PXF_dedx_[tTopo->pxfDisk(detId)-1]->Fill(f_dx);
 			   histos_PDG_PXF_dedx_[tTopo->pxfDisk(detId)-1]->Fill(abs((*Hits).particleType()), (*Hits).energyLoss()/f_dx);
 			   histos_PDG_PXF_dx_[tTopo->pxfDisk(detId)-1]->Fill(abs((*Hits).particleType()), f_dx);
 			   histos_p_PXF_dedx_[tTopo->pxfDisk(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
@@ -443,7 +445,7 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 			   h_Hit_StripDets_dedx_Track_P_->Fill((*simTrack).momentum().P(), (*Hits).energyLoss()/f_dx);
 			   h_Hit_StripDets_Map_->Fill(theGeomDet->toGlobal((*Hits).localPosition()).z(),
 						      theGeomDet->toGlobal((*Hits).localPosition()).y());
-			   histos_TIB_dedx_[tTopo->tibLayer(detId)-1]->Fill((*Hits).energyLoss()/f_dx);
+			   histos_TIB_dedx_[tTopo->tibLayer(detId)-1]->Fill(f_dx);
 			   histos_PDG_TIB_dedx_[tTopo->tibLayer(detId)-1]->Fill(abs((*Hits).particleType()), (*Hits).energyLoss()/f_dx);
 			   histos_PDG_TIB_dx_[tTopo->tibLayer(detId)-1]->Fill(abs((*Hits).particleType()), f_dx);
 			   histos_p_TIB_dedx_[tTopo->tibLayer(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
@@ -455,7 +457,7 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 			   h_Hit_StripDets_dedx_Track_P_->Fill((*simTrack).momentum().P(), (*Hits).energyLoss()/f_dx);
 			   h_Hit_StripDets_Map_->Fill(theGeomDet->toGlobal((*Hits).localPosition()).z(),
 						      theGeomDet->toGlobal((*Hits).localPosition()).y());
-			   histos_TOB_dedx_[tTopo->tobLayer(detId)-1]->Fill((*Hits).energyLoss()/f_dx); 
+			   histos_TOB_dedx_[tTopo->tobLayer(detId)-1]->Fill(f_dx); 
 			   histos_PDG_TOB_dedx_[tTopo->tobLayer(detId)-1]->Fill(abs((*Hits).particleType()), (*Hits).energyLoss()/f_dx);
 			   histos_PDG_TOB_dx_[tTopo->tobLayer(detId)-1]->Fill(abs((*Hits).particleType()), f_dx);
 			   histos_p_TOB_dedx_[tTopo->tobLayer(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
@@ -467,7 +469,7 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 			   h_Hit_StripDets_dedx_Track_P_->Fill((*simTrack).momentum().P(), (*Hits).energyLoss()/f_dx);
 			   h_Hit_StripDets_Map_->Fill(theGeomDet->toGlobal((*Hits).localPosition()).z(),
 						      theGeomDet->toGlobal((*Hits).localPosition()).y());
-			   histos_TID_dedx_[tTopo->tidRing(detId)-1]->Fill((*Hits).energyLoss()/f_dx);
+			   histos_TID_dedx_[tTopo->tidRing(detId)-1]->Fill(f_dx);
 			   histos_PDG_TID_dedx_[tTopo->tidRing(detId)-1]->Fill(abs((*Hits).particleType()), (*Hits).energyLoss()/f_dx);
 			   histos_PDG_TID_dx_[tTopo->tidRing(detId)-1]->Fill(abs((*Hits).particleType()), f_dx);
 			   histos_p_TID_dedx_[tTopo->tidRing(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
@@ -479,7 +481,7 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 			   h_Hit_StripDets_dedx_Track_P_->Fill((*simTrack).momentum().P(), (*Hits).energyLoss()/f_dx);
 			   h_Hit_StripDets_Map_->Fill(theGeomDet->toGlobal((*Hits).localPosition()).z(),
 						      theGeomDet->toGlobal((*Hits).localPosition()).y());
-			   histos_TEC_dedx_[tTopo->tecRing(detId)-1]->Fill((*Hits).energyLoss()/f_dx);
+			   histos_TEC_dedx_[tTopo->tecRing(detId)-1]->Fill(f_dx);
 			   histos_PDG_TEC_dedx_[tTopo->tecRing(detId)-1]->Fill(abs((*Hits).particleType()), (*Hits).energyLoss()/f_dx);
 			   histos_PDG_TEC_dx_[tTopo->tecRing(detId)-1]->Fill(abs((*Hits).particleType()), f_dx);
 			   histos_p_TEC_dedx_[tTopo->tecRing(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
@@ -568,7 +570,7 @@ DemoAnalyzer::bookHistosPerDetector()
 {
     //EnergyLosses1D
     int    i_nbins = 200;
-    float  f_range = 1e-2;
+    float  f_range = 5e-2;
     //EnergyLosses2D-PDG binning
     int    i_nbins_PDG = 2*2212;
     float  f_range_PDG = 2213;

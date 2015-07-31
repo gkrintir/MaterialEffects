@@ -14,7 +14,7 @@ process.load("Configuration.EventContent.EventContent_cff")
 process.load("Configuration.StandardSequences.Reconstruction_cff")
 process.load("Configuration.StandardSequences.MagneticField_cff")
 
-f = open('muons_FULLSIM_GENSIM_02_5.txt', 'r')
+f = open('protons_FULLSIM_GENSIM_02_5.txt', 'r')
 
 myfilelist = cms.untracked.vstring()
 myfilelist.extend( [line.strip() for line in f.read().splitlines()] )
@@ -31,7 +31,7 @@ process.source = cms.Source("PoolSource",
         #FastSim Samples (locally)
         #'file:/afs/cern.ch/user/g/gkrintir/github/GenSim/CMSSW_7_3_0/src/mygun_muons_FASTSIM.root'
 
-        'file:/afs/cern.ch/user/g/gkrintir/github/GenSim/CMSSW_7_3_0/src/Generation_Output/FastSim/GENSIM/mygyn_muons_FASTSIM_noflatpT_NuclearOFF.root',
+        'file:/afs/cern.ch/user/g/gkrintir/github/GenSim/CMSSW_7_3_0/src/Generation_Output/FastSim/GENSIM/mygun_ppions_FASTSIM_SameFULLSIMConditions_noflatpT_NuclearOFF.root',
         #'file:/afs/cern.ch/user/g/gkrintir/github/GenSim/CMSSW_7_3_0/src/mygun_protons_FASTSIM_SameFULLSIMConditions_noflatpT.root,
         #'file:/afs/cern.ch/user/g/gkrintir/github/GenSim/CMSSW_7_3_0/src/mygun_kaons_FASTSIM_SameFULLSIMConditions_noflatpT.root'
         )
