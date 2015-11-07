@@ -40,6 +40,7 @@
 #include "SimDataFormats/TrackingHit/interface/PSimHit.h"
 #include "SimDataFormats/Track/interface/SimTrack.h"
 #include "SimDataFormats/Track/interface/SimTrackContainer.h"
+#include "SimGeneral/HepPDTRecord/interface/PdtEntry.h"
 
 #include "DataFormats/Math/interface/Vector3D.h"
 #include "Geometry/Records/interface/IdealGeometryRecord.h"
@@ -92,6 +93,7 @@ class DemoAnalyzer : public DQMEDAnalyzer {
 			       const TString &var, const TString &det, unsigned int nHistos );
 
       std::vector<edm::InputTag> simHitsTag_;
+      std::string particles_;
       std::vector<std::string> bins_E;
       std::vector<std::string> bins_p;
 
@@ -132,6 +134,14 @@ class DemoAnalyzer : public DQMEDAnalyzer {
       void removeWhiteSpaces( std::string &strg );
 
       std::vector<std::vector<MonitorElement*> > histos_protons_p_dedx_;
+      typedef std::vector<std::vector<MonitorElement*> > MyClassSetVector;
+      typedef std::map<std::string,  MyClassSetVector > MyClassSetMap;
+      MyClassSetMap my_map1;
+      MyClassSetMap my_map2;
+
+
+  //typedef typename std::vector<T>::iterator iterator;
+
       std::vector<std::vector<MonitorElement*> > histos_protons_dedx_;
   
       std::vector<std::vector<MonitorElement*> > histos_pions_p_dedx_;
@@ -233,6 +243,7 @@ class DemoAnalyzer : public DQMEDAnalyzer {
 DemoAnalyzer::DemoAnalyzer(const edm::ParameterSet& iConfig):
 
   simHitsTag_(iConfig.getParameter<std::vector<edm::InputTag> >("SimHitTagLabels")),
+  particles_(),
   bins_E(),
   bins_p()
   //fNbEvtToPrint(iConfig.getUntrackedParameter<std::vector<float> >("NbEventsToPrint"))
@@ -311,10 +322,12 @@ DemoAnalyzer::DemoAnalyzer(const edm::ParameterSet& iConfig):
 
     }
 
+    particles_ = iConfig.getUntrackedParameter <std::string > ("particles");
     bins_E = iConfig.getUntrackedParameter <std::vector <std::string> > ("bins_E", std::vector<std::string>());
     bins_p = iConfig.getUntrackedParameter <std::vector <std::string> > ("bins_p", std::vector<std::string>());
 
-    if (!bins_p.empty()) {
+    //if (!bins_p.empty()) 
+    if (iConfig.exists("bins_p")) {
       sort(bins_p.begin(),bins_p.end());	
 	
       for (unsigned int it=0; it!=bins_p.size(); ++it)
@@ -471,9 +484,31 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 			     //histos_protons_p_dedx_[0][tTopo->pxbLayer(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
 			     if (pos!=0 && pos<int(bins1_.size()-1)){
 			       std::cout<<momentumAtEntry<<" meta "<<pos<<" meta "<<bins1_.size()<<" "<<(*Hits).particleType()<<std::endl;
-			       histos_protons_dedx_[0][pos-1]->Fill((*Hits).energyLoss()/f_dx);
+			       //histos_protons_dedx_[0][pos-1]->Fill((*Hits).energyLoss()/f_dx);
+			       typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
+			
+				for( iter iterator = my_map1.begin(); iterator != my_map1.end(); ++iterator ) {
+				  MyClassSetVector foo = iterator->second;
+				  std::cout<<" "<<iterator->first<<std::endl;    
+				  //for (unsigned i =0; i<foo.size(); i++) {
+				  foo[0][pos-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
+				  //std::cout <<  " " << foo[0][0]->Fill(0) << std::endl;
+				  //}
+				}
+			       
 			     }
 			     histos_protons_p_dedx_[0][0]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
+			     
+			     typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
+    			     for( iter iterator = my_map2.begin(); iterator != my_map2.end(); ++iterator ) {
+			       MyClassSetVector foo = iterator->second;
+			       std::cout<<" "<<iterator->first<<std::endl;    
+			       //for (unsigned i =0; i<foo.size(); i++) {
+				 foo[0][0]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
+				 //std::cout <<  " " << foo[0][0]->Fill(0) << std::endl;
+				 //}
+			     }
+			     
 
 			   }
 			   else if (abs((*Hits).particleType())==211)
@@ -499,7 +534,17 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 			     if (isub == StripSubdetector::TEC && tTopo->tecRing(detId)>=5) {
 			       if (pos!=0 && pos<int(bins1_.size()-1)){
 				 std::cout<<momentumAtEntry<<" meta "<<pos<<" meta "<<bins1_.size()<<" "<<(*Hits).particleType()<<std::endl;
-				 histos_protons_dedx_[2][pos-1]->Fill((*Hits).energyLoss()/f_dx);
+				 //histos_protons_dedx_[2][pos-1]->Fill((*Hits).energyLoss()/f_dx);
+				 typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
+				 
+				 for( iter iterator = my_map1.begin(); iterator != my_map1.end(); ++iterator ) {
+				   MyClassSetVector foo = iterator->second;
+				   std::cout<<" "<<iterator->first<<std::endl;    
+				   //for (unsigned i =0; i<foo.size(); i++) {
+				   foo[2][pos-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
+				   //std::cout <<  " " << foo[0][0]->Fill(0) << std::endl;
+				   //}
+				}
 			       }
 			       histos_protons_p_dedx_[2][0]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
 			     }
@@ -507,9 +552,20 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 			     else {
 			       if (pos!=0 && pos<int(bins1_.size()-1)){
 				 std::cout<<momentumAtEntry<<" meta "<<pos<<" meta "<<bins1_.size()<<" "<<(*Hits).particleType()<<std::endl;
-				 histos_protons_dedx_[1][pos-1]->Fill((*Hits).energyLoss()/f_dx);
-			       }
+				 //histos_protons_dedx_[1][pos-1]->Fill((*Hits).energyLoss()/f_dx);
+				  typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
+				  for( iter iterator = my_map1.begin(); iterator != my_map1.end(); ++iterator ) {
+				  MyClassSetVector foo = iterator->second;
+				  std::string particle = iterator->first;
+				  std::cout<<" "<<iterator->first<<std::endl;    
+				  //for (unsigned i =0; i<foo.size(); i++) {
+				  if (particle.compare("protons")==0)
+				    foo[1][pos-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
+				  //std::cout <<  " " << foo[0][0]->Fill(0) << std::endl;
+				  //}
+				  }
 			       histos_protons_p_dedx_[1][0]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
+			       }
 			     }
 			   }
 			   else if (abs((*Hits).particleType())==211)
@@ -518,9 +574,18 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 			     if (isub == StripSubdetector::TEC && tTopo->tecRing(detId)>=5){
 			       if (pos!=0 && pos<int(bins1_.size()-1)){
 				 std::cout<<momentumAtEntry<<" meta "<<pos<<" meta "<<bins1_.size()<<" "<<(*Hits).particleType()<<std::endl;
-				 histos_pions_dedx_[2][pos-1]->Fill((*Hits).energyLoss()/f_dx);
+				 //histos_pions_dedx_[2][pos-1]->Fill((*Hits).energyLoss()/f_dx);
+				  typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
+				  for( iter iterator = my_map1.begin(); iterator != my_map1.end(); ++iterator ) {
+				  MyClassSetVector foo = iterator->second;
+				  std::cout<<" "<<iterator->first<<std::endl;    
+				  //for (unsigned i =0; i<foo.size(); i++) {
+				  foo[2][pos-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
+				  //std::cout <<  " " << foo[0][0]->Fill(0) << std::endl;
+				  //}
+				  }
 			       }
-			       histos_pions_p_dedx_[2][0]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
+				  histos_pions_p_dedx_[2][0]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
 			     }
 			     else {
 			       if (pos!=0 && pos<int(bins1_.size()-1)){
@@ -789,8 +854,11 @@ DemoAnalyzer::bookHistosPerParticle(const std::string& str_particles,  DQMStore:
       vctr_particles.push_back(s_particle);
     }
   
-    std::cout<<vctr_particles.size()<<std::endl;
+    //    std::cout<<vctr_particles.size()<<std::endl;
     //
+    MyClassSetVector histos_particles_p_dedx;
+    //MyClassSetMap my_map;
+    
 
     for (unsigned int i=0; i<vctr_particles.size(); ++i) 
     {
@@ -811,10 +879,14 @@ DemoAnalyzer::bookHistosPerParticle(const std::string& str_particles,  DQMStore:
 	      // }
 
 	    bookEnergyLosses1D( histos_PXB_dedx, ibooker, i_nbins_dedx, f_range_dedx, "dEdx", Form("%s_%s", str_subdet.data(), vctr_particles[i].data()), x.second );
+	    my_map1[vctr_particles[i]].push_back(histos_PXB_dedx);
 	    if (vctr_particles[i].compare("protons")==0)
 	    {
 	      //if(!b_initialize_EnergyLossesRelatedInfo2D){
-	        histos_protons_p_dedx_.push_back(histos_PDG_PXF_dedx);
+	      histos_protons_p_dedx_.push_back(histos_PDG_PXF_dedx);
+	      histos_particles_p_dedx.push_back(histos_PDG_PXF_dedx);
+	      
+	      my_map2[vctr_particles[i]].push_back(histos_PDG_PXF_dedx);
 		//b_initialize_EnergyLossesRelatedInfo2D = true;
 		//	      }
 	      histos_protons_dedx_.push_back(histos_PXB_dedx);
@@ -830,6 +902,26 @@ DemoAnalyzer::bookHistosPerParticle(const std::string& str_particles,  DQMStore:
 	    }
 	}
     }
+    std::cout<<my_map1.size()<<std::endl;
+
+    /*It works!
+    typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
+    
+    for( iter iterator = my_map.begin(); iterator != my_map.end(); ++iterator ) {
+      MyClassSetVector foo = iterator->second;
+      
+      //std::string Key = iter.first;
+      //iterator->first = key
+      std::cout<<" "<<iterator->first<<std::endl;    
+      
+      for (unsigned i =0; i<foo.size(); i++) {
+	foo[0][0]->Fill(0);
+	//std::cout <<  " " << foo[0][0]->Fill(0) << std::endl;
+      }
+    }
+    */
+    
+    //my_map["protons"]
 }
 
 
@@ -885,13 +977,16 @@ void DemoAnalyzer::bookHistograms(DQMStore::IBooker & ibooker, edm::Run const & 
      ibooker.setCurrentFolder("testMaterialEffects");
      //map_subdet_nlayers_.insert(std::pair<std::string,int>("PXF",2));
      //map_subdet_nlayers_.insert(std::pair<std::string,int>("PXB",3));
-     map_subdet_nlayers_.insert(std::pair<std::string,int>("Pixels",bins_p.size()-1));
+     map_subdet_nlayers_.insert(std::pair<std::string,int>("Pixels",bins1_.size()-1));
      map_subdet_nlayers_.insert(std::pair<std::string,int>("StripsNoTEC5to7",bins_p.size()-1));
      map_subdet_nlayers_.insert(std::pair<std::string,int>("StripsOnlyTEC5to7",bins_p.size()-1));
 
 
-     bookHistosPerParticle("protons:pions", ibooker);
-     
+     //bookHistosPerParticle("protons:pions", ibooker);
+     if (!particles_.empty()) {
+     bookHistosPerParticle(particles_, ibooker);
+     }
+          
 }
 
 void 
