@@ -72,33 +72,6 @@
 //https://github.com/cirkovic/my-cmssw/blob/master/DQMOffline/RecoB/plugins/BTagPerformanceAnalyzerOnData.cc
 //https://github.com/cms-tau-pog/HighPtTau_539/blob/master/PhysicsTools/PatAlgos/plugins/PATGenCandsFromSimTracksProducer.cc
 
-struct SelectedProcessPaths
-{
-    std::string processName;
-    int rebin;
-    std::vector<std::string> paths;
-};
-
-
-template <typename T>
-class MyQueue
-{
-std::vector<T> data;
-public:
-void Add(T const &);
-void Remove();
-unsigned int Print();
-};
-
-template <typename T> void MyQueue<T> ::Add(T const &d)
-{
-data.push_back(d);
-}
-
-template <typename T> unsigned int MyQueue<T> ::Print()
-{
-return data.size();
-}
 
 class DemoAnalyzer : public DQMEDAnalyzer {
    public:
@@ -106,6 +79,25 @@ class DemoAnalyzer : public DQMEDAnalyzer {
       ~DemoAnalyzer();
 
       static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
+
+      struct formating1D
+      {
+	  std::string title;
+	  std::string name;
+	  std::string labelx;
+	  std::string labely;
+	  std::vector<double> rangex;
+      };
+  
+    struct formating2D
+    {
+        std::string title;
+        std::string name;
+        std::string labelx;
+        std::string labely;
+        std::vector<double> rangex;
+        std::vector<double> rangey;
+    };
 
 
    private:
@@ -115,20 +107,20 @@ class DemoAnalyzer : public DQMEDAnalyzer {
       void bookHistograms(DQMStore::IBooker &, edm::Run const &, edm::EventSetup const &) override;
   
       // ----------member data ---------------------------
-      bool processFastSim_;
-      //void bookHistosPerParticle( const std::string& particles,  DQMStore::IBooker & ibooker );
       template <typename T> 
-      //void bookHistosPerParticle(MyQueue<T> & vec,  DQMStore::IBooker & ibooker);
       void bookHistosPerParticle(std::vector<T> & vec,  DQMStore::IBooker & ibooker);
 
   
       void bookEnergyLossesRelatedInfo2D( std::vector<MonitorElement*>&, DQMStore::IBooker & ibooker,
 					  int nBinsX, float rangeX,  int nBinsY, float rangeY, 
-					  const TString &varX, const TString &varY, const TString &det, unsigned int nHistos );
+					  const TString &varX, const TString &varY, const TString &det );
 
-      void bookEnergyLosses1D( std::vector<MonitorElement*>&, DQMStore::IBooker & ibooker, int nBins, float range, 
-			       const TString &var, const TString &det, unsigned int nHistos );
+      void bookEnergyLossesRelatedInfo1D( std::vector<MonitorElement*>&, DQMStore::IBooker & ibooker, int nBins, float range, 
+					  const TString &var, const TString &det, unsigned int nHistos );
 
+      void parseFormating1DConfiguration(const std::vector<edm::ParameterSet>& selectEventPSets);
+      void parseFormating2DConfiguration(const std::vector<edm::ParameterSet>& selectEventPSets);
+   
       std::vector<edm::InputTag> simHitsTag_;
       std::string particles_;
       std::vector<std::string> bins_E;
@@ -137,41 +129,11 @@ class DemoAnalyzer : public DQMEDAnalyzer {
       std::vector<double> bins_test_;
       std::vector<float> bins1_;
       std::vector<PdtEntry> pdts_;   // these are needed before we get the EventSetup
-  //ESHandle<HepPDT::ParticleDataTable> fPDGTable ;
-  /*
-      edm::InputTag simHitsTag_PXB_Lowtof_;
-      edm::InputTag simHitsTag_PXB_Hightof_;
-      edm::InputTag simHitsTag_PXF_Lowtof_;
-      edm::InputTag simHitsTag_PXF_Hightof_;
-      edm::InputTag simHitsTag_TEC_Lowtof_;
-      edm::InputTag simHitsTag_TEC_Hightof_;
-      edm::InputTag simHitsTag_TIB_Lowtof_;
-      edm::InputTag simHitsTag_TIB_Hightof_;
-      edm::InputTag simHitsTag_TID_Lowtof_;
-      edm::InputTag simHitsTag_TID_Hightof_;
-      edm::InputTag simHitsTag_TOB_Lowtof_;
-      edm::InputTag simHitsTag_TOB_Hightof_;
-  */
 
-      //edm::Service<TFileService> fs_;
-  /*
-      //Funtions
-      void bookHistosPerDetector();
-      void bookEnergyLosses1D( std::vector<TH1F*>&, int nBins, float range, const TString &det, unsigned int nHistos );
-  
-      void bookEnergyLossesRelatedInfo2D( std::vector<TH2F*>&, 
-					  int nBinsX, float rangeX,  int nBinsY, float rangeY, 
-					  const TString &var, const TString &det, unsigned int nHistos );
-  
-      void bookEnergyLossesRelatedInfo2D( std::vector<TH2F*>&,
-					  int nBinsX, float rangeX,  int nBinsY, float rangeY,
-					  const TString &var, const TString &det );
-  */
       //Helper Functions
       void identifyToken(std::set<char> & , const std::string& );
       void removeWhiteSpaces( std::string &strg );
 
-      std::vector<std::vector<MonitorElement*> > histos_protons_p_dedx_;
       typedef std::vector<std::vector<MonitorElement*> > MyClassSetVector;
       typedef std::map<std::string,  MyClassSetVector > MyClassSetMap;
       MyClassSetMap my_map1;
@@ -180,91 +142,18 @@ class DemoAnalyzer : public DQMEDAnalyzer {
       typedef StringCutObjectSelector<reco::GenParticle> StrFilter;
       std::auto_ptr<StrFilter> filter_;
 
-      //typedef typename std::vector<T>::iterator iterator;
-
-      std::vector<std::vector<MonitorElement*> > histos_protons_dedx_;
-      std::vector<std::vector<MonitorElement*> > histos_pions_p_dedx_;
-      std::vector<std::vector<MonitorElement*> > histos_pions_dedx_;
-
-
-      //  Detectors
+      edm::ParameterSet particleFilter_;
+      double etaMax_;
+      double pTMin_;
+      double EMin_;
+      formating1D selectedProcessPaths_;
+      formating2D selectedProcessPaths2_;
+      // Detectors
       std::map<std::string, int> map_subdet_nlayers_;
 
      
-  /*
-      // Histograms      
-      //Generator Level
-      TH1F* h_Genpart_Mother_Pt_;
-      TH1F* h_Genpart_Daughter_Pt_;
-      
-      // Simulation Level 
-      ////SimTrack Class
-      TH1F* h_Track_P_;
-      TH1F* h_Track_Pt_;
-      TH1F* h_Track_Phi_;
-      TH1F* h_Track_Eta_;
-      TH1I* h_Track_Multiplicity_;
-      TH2F* h_Track_ID_Track_Pt_;
-      ////PSimHit Class
-      TH1F* h_Hit_Pixels_P_AtEntry_;
-      TH1F* h_Hit_Strips_P_AtEntry_;
-      TH1I* h_Hit_PXBPXF_PerLayer_Multiplicity_;
-      TH1I* h_Hit_PixelDets_Multiplicity_;
-      TH1I* h_Hit_StripDets_Multiplicity_;
-      TH2F* h_Hit_PixelDets_Map_;
-      TH2F* h_Hit_StripDets_Map_;
-      TH2F* h_Hit_PixelDets_dedx_P_AtEntry_;
-      TH2F* h_Hit_StripDets_dedx_P_AtEntry_;
-      ////PSimHit against SimTrack Class
-      TH2F* h_Hit_PixelDets_dedx_Track_P_;
-      TH2F* h_Hit_StripDets_dedx_Track_P_;
-      TH2F* h_Hit_PixelDets_Multiplicity_Track_P_;
-      TH2F* h_Hit_StripDets_Multiplicity_Track_P_;
-
-      //  Detectors
-      std::map<std::string, int> map_subdet_nlayers_;
-      ////Pixel Barrel - 3 different detectors
-      static const unsigned int nHistos_PXB_ = 3;
-      std::vector<TH1F*> histos_PXB_dedx_;
-      std::vector<TH2F*> histos_PDG_PXB_dedx_;
-
-      std::vector<std::vector<TH2F*> > histos_pions_p_dedx_;
-      std::vector<TH2F*> histos_PDG_PXB_dx_;
-      std::vector<TH2F*> histos_p_PXB_dedx_;
-      ////Pixel Endcap - 2 different detectors
-      static const unsigned int nHistos_PXF_ = 2;
-      std::vector<TH1F*> histos_PXF_dedx_;
-      std::vector<TH2F*> histos_PDG_PXF_dedx_;
-      std::vector<TH2F*> histos_PDG_PXF_dx_;
-      std::vector<TH2F*> histos_p_PXF_dedx_;
-      ////TIB - 4 different detectors
-      static const unsigned int nHistos_TIB_ = 4;
-      std::vector<TH1F*> histos_TIB_dedx_;
-      std::vector<TH2F*> histos_PDG_TIB_dedx_;
-      std::vector<TH2F*> histos_PDG_TIB_dx_;
-      std::vector<TH2F*> histos_p_TIB_dedx_;
-      ////TOB - 6 different detectors
-      static const unsigned int nHistos_TOB_ = 6;
-      std::vector<TH1F*> histos_TOB_dedx_;
-      std::vector<TH2F*> histos_PDG_TOB_dedx_;
-      std::vector<TH2F*> histos_PDG_TOB_dx_;
-      std::vector<TH2F*> histos_p_TOB_dedx_;
-      ////TID - 3 different detectors
-      static const unsigned int nHistos_TID_ = 3;
-      std::vector<TH1F*> histos_TID_dedx_;
-      std::vector<TH2F*> histos_PDG_TID_dedx_;
-      std::vector<TH2F*> histos_PDG_TID_dx_;
-      std::vector<TH2F*> histos_p_TID_dedx_;
-      ////TEC - 9 different detectors
-      static const unsigned int nHistos_TEC_ = 7;
-      std::vector<TH1F*> histos_TEC_dedx_;
-      std::vector<TH2F*> histos_PDG_TEC_dedx_;
-      std::vector<TH2F*> histos_PDG_TEC_dx_;
-      std::vector<TH2F*> histos_p_TEC_dedx_;
-  */
       // PSimHits
       std::vector<edm::InputTag> trackerContainers_;
-      //
     
 };
 
@@ -284,7 +173,8 @@ DemoAnalyzer::DemoAnalyzer(const edm::ParameterSet& iConfig):
   simHitsTag_(iConfig.getParameter<std::vector<edm::InputTag> >("SimHitTagLabels")),
   particles_(),
   bins_E(),
-  bins_p()
+  bins_p(),
+  selectedProcessPaths_()
   //bins_test(iConfig.getUntrackedParameter<std::vector<double> >("NbEventsToPrint",0.))
   //bins_test(2,static_cast<float>(0.))
 
@@ -292,88 +182,22 @@ DemoAnalyzer::DemoAnalyzer(const edm::ParameterSet& iConfig):
 
 
 {
-    //now do what ever initialization is needed
-  /*
-    //Generator Level
-    h_Genpart_Mother_Pt_ = fs_->make<TH1F>("Genpart_Mother_Pt", ";p_{T}", 200, 0., 12.); //ok
-    h_Genpart_Daughter_Pt_ = fs_->make<TH1F>("Genpart_Daughter_Pt", ";p_{T}", 200, 0., 12.); //ok
-  
-    //Simulation Level 
-    ////SimTrack Class
-    h_Track_P_ = fs_->make<TH1F>("SimTrack_P", ";P", 200, 0., 100.); //ok
-    h_Track_Pt_ = fs_->make<TH1F>("SimTrack_Pt", ";#p_{T}", 200, 0., 100.); //ok
-    h_Track_Phi_ = fs_->make<TH1F>("SimTrack_Phi", ";#phi", 200, -TMath::Pi(), TMath::Pi()); //ok
-    h_Track_Eta_ = fs_->make<TH1F>("SimTrack_Eta", ";#eta", 200, -2.5, 2.5); //ok
-    h_Track_Multiplicity_ = fs_->make<TH1I>("SimTrack_Multiplicity", ";N_{Tracks}", 29, 1, 30); //ok
-    h_Track_ID_Track_Pt_ = fs_->make<TH2F>("Track_ID_Track_Pt", ";P;PDG", 2400, 0., 100., 2*2212, 0., 2213.); //ok
-    
-    ////PSimHit Class
-    h_Hit_Pixels_P_AtEntry_ = fs_->make<TH1F>("PSimHit_Pixels_P_AtEntry", ";P", 200, 0., 100.); //ok
-    h_Hit_Strips_P_AtEntry_ = fs_->make<TH1F>("PSimHit_Strips_P_AtEntry", ";P", 200, 0., 100.); //ok
-    
-    h_Hit_PXBPXF_PerLayer_Multiplicity_ = fs_->make<TH1I>("PSimHit_Multiplicity_PXBPXF", ";Pixel Layer", 5, 1, 6); //ok
-    h_Hit_PixelDets_Multiplicity_ = fs_->make<TH1I>("PSimHit_AllPixelLayers", ";PSimHits_{Pixels}", 29, 1, 30); //ok
-    h_Hit_StripDets_Multiplicity_ = fs_->make<TH1I>("PSimHit_AllStripLayers", ";PSimHits_{Strips}", 29, 1, 30); //ok
-    
-    h_Hit_PixelDets_Map_ = fs_->make<TH2F>("PSimHit_AllPixelLayers_Map", ";z;y", 240, -300., 300., 240, -140., 140.); //ok
-    h_Hit_StripDets_Map_ = fs_->make<TH2F>("PSimHit_AllStripLayers_Map", ";z;y", 240, -300., 300., 240, -140., 140.); //ok
-    
-    h_Hit_PixelDets_dedx_P_AtEntry_ = fs_->make<TH2F>("PSimHit_AllPixelLayers_dedx_P_AtEntry", ";P;dedx", 240, 0., 100., 240, 0., .01); //ok
-    h_Hit_StripDets_dedx_P_AtEntry_ = fs_->make<TH2F>("PSimHit_AllStripLayersd_dedx_P_AtEntry", ";P;dedx", 240, 0., 100., 240, 0., .01); //ok
-    
-    
-    ////PSimHit against SimTrack Class
-    h_Hit_PixelDets_Multiplicity_Track_P_ = fs_->make<TH2F>("PSimHit_AllPixelLayers_Multiplicity_SimTrack_P", ";PSimHits_{Pixels};P",
-							    29, 1, 30, 640, 0., 100.); //ok
-    h_Hit_StripDets_Multiplicity_Track_P_ = fs_->make<TH2F>("PSimHit_AllStripLayers_Multiplicity_SimTrack_P", ";PSimHits_{Strips};P",
-							    29, 1, 30, 640, 0., 100.); //ok
-    
-    h_Hit_PixelDets_dedx_Track_P_ = fs_->make<TH2F>("PSimHit_AllPixelLayers_dedx_Track_P", ";P;dedx", 640, 0., 100., 240, 0., .01); //ok
-    h_Hit_StripDets_dedx_Track_P_ = fs_->make<TH2F>("PSimHit_AllStripLayers_dedx_Track_P", ";P;dedx", 640, 0., 100., 240, 0., .01); //ok
-    
-    bookHistosPerDetector();
-    map_subdet_nlayers_.insert(std::pair<std::string,int>("PXB",3));
-    map_subdet_nlayers_.insert(std::pair<std::string,int>("PXF",2));
-
-    bookHistosPerParticle("protons:pions");
-  */
-    processFastSim_ = iConfig.getUntrackedParameter<bool>("processFastSim");
-    //if (processFastSim_)
-    // trackerContainers_.push_back(simHitsTag_[0]);
-    
-    //else {
-      for (unsigned int i_subDet=0; i_subDet<simHitsTag_.size(); ++i_subDet){
-        trackerContainers_.push_back(simHitsTag_[i_subDet]);
-	/*
-	trackerContainers_.push_back(simHitsTag_PXB_Hightof_);
-	trackerContainers_.push_back(simHitsTag_PXF_Lowtof_);
-	trackerContainers_.push_back(simHitsTag_PXF_Hightof_);
-	trackerContainers_.push_back(simHitsTag_TEC_Lowtof_);
-	trackerContainers_.push_back(simHitsTag_TEC_Hightof_);
-	trackerContainers_.push_back(simHitsTag_TIB_Lowtof_);
-	trackerContainers_.push_back(simHitsTag_TIB_Hightof_);
-	trackerContainers_.push_back(simHitsTag_TID_Lowtof_);
-	trackerContainers_.push_back(simHitsTag_TID_Hightof_);
-	trackerContainers_.push_back(simHitsTag_TOB_Lowtof_);
-	trackerContainers_.push_back(simHitsTag_TOB_Hightof_);
-	*/
+      for (unsigned int i_subDet=0; i_subDet<simHitsTag_.size(); ++i_subDet)
+      {
+          trackerContainers_.push_back(simHitsTag_[i_subDet]);
       }
-
-      //}
 
 
     // Possibly allow a list of particle types
     if (iConfig.exists("particleTypes")) 
     {
-      //std::vector<PdtEntry> defdauID1;
-	 //defdauID1.push_back('');
-    pdts_ = iConfig.getUntrackedParameter<std::vector<PdtEntry> >("particleTypes");
+        pdts_ = iConfig.getUntrackedParameter<std::vector<PdtEntry> >("particleTypes");
     }
     // Possibly allow a string cut
     if (iConfig.existsAs<std::string>("filter")) 
     {
         std::string filter = iConfig.getParameter<std::string>("filter");
-        if (!filter.empty()) 
+        if (!filter.empty())
 	{
  	    filter_ = std::auto_ptr<StrFilter>(new StrFilter(filter));
         }
@@ -383,11 +207,7 @@ DemoAnalyzer::DemoAnalyzer(const edm::ParameterSet& iConfig):
     bins_E = iConfig.getUntrackedParameter <std::vector <std::string> > ("bins_E", std::vector<std::string>());
     bins_p = iConfig.getUntrackedParameter <std::vector <std::string> > ("bins_p", std::vector<std::string>());
 
-    std::vector<double> defdauID;
-    defdauID.push_back(0);
-    defdauID.push_back(0);
-    defdauID.push_back(0);
-    bins_test_ = iConfig.getUntrackedParameter< std::vector<double> >("DaughterIDs"); //iConfig.getUntrackedParameter <std::vector <float> > ("bins_test", defdauID);
+    bins_test_ = iConfig.getUntrackedParameter< std::vector<double> >("DaughterIDs");
     std::cout << " !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! " << bins_test_[0]<< std::endl;
     sort(bins_test_.begin(),bins_test_.end());
     
@@ -401,18 +221,24 @@ DemoAnalyzer::DemoAnalyzer(const edm::ParameterSet& iConfig):
       sort(bins1_.begin(),bins1_.end());	
     }
     
-    /*
-    std::list<float>::iterator it;
-
-      std::cout << ' ' << *it;
-    */
-
-    if (iConfig.exists("formating"))
+    if (iConfig.exists("TestParticleFilter"))
     {
-        const std::vector<edm::ParameterSet>& selectEventPSets = iConfig.getParameter<std::vector<edm::ParameterSet>>("formating");
-	for (unsigned int iname=0; iname< selectEventPSets.size(); ++iname)
-	  std::cout << " !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! " << selectEventPSets[iname]<< std::endl;
-	
+    	particleFilter_ = iConfig.getParameter<edm::ParameterSet>("TestParticleFilter");
+        etaMax_ = particleFilter_.getParameter<double>("etaMax");
+	pTMin_ = particleFilter_.getParameter<double>("pTMin");
+	EMin_ = particleFilter_.getParameter<double>("EMin");
+	std::cout<<" eta!!!! "<<EMin_<<std::endl;
+    }
+
+    if (iConfig.exists("formating1D"))
+    {
+        const std::vector<edm::ParameterSet>& selectEventPSets = iConfig.getParameter<std::vector<edm::ParameterSet>>("formating1D");
+	parseFormating1DConfiguration(selectEventPSets);
+    }
+    if (iConfig.exists("formating2D"))
+    {
+        const std::vector<edm::ParameterSet>& selectEventPSets = iConfig.getParameter<std::vector<edm::ParameterSet>>("formating2D");
+	parseFormating2DConfiguration(selectEventPSets);
     }
 }
 
@@ -732,9 +558,6 @@ DemoAnalyzer::bookHistosPerParticle(std::vector<T> & vec,  DQMStore::IBooker & i
 
     for (unsigned int i=0; i<vec.size(); ++i) 
       {
-      //bool b_initialize_EnergyLossesRelatedInfo2D = false;
-	//bool b_store_protons_EnergyLossesRelatedInfo2D= false;
-	//bool b_store_pions_EnergyLossesRelatedInfo2D= false;
         for ( auto& x: map_subdet_nlayers_)//=map_subdet_nlayers_.begin(); it!=map_subdet_nlayers_.end(); ++it)
 	{
 	    
@@ -743,74 +566,32 @@ DemoAnalyzer::bookHistosPerParticle(std::vector<T> & vec,  DQMStore::IBooker & i
 
 	    std::string str_subdet; 
 	    str_subdet.append(x.first);
+	    std::cout << " !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! " << selectedProcessPaths_.name.data()<< std::endl;
 
-	    //if(!b_initialize_EnergyLossesRelatedInfo2D) {
-	    bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dedx, ibooker, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "p", "dEdx", Form("%s_%s", str_subdet.data(), vec[i].data()), 1 );
-	    //bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dedx, ibooker, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "p", "dEdx", Form("%s_%s", str_subdet.data(), "test"), 1 );
-	      // }
-
-	    bookEnergyLosses1D( histos_PXB_dedx, ibooker, i_nbins_dedx, f_range_dedx, "dEdx", Form("%s_%s", str_subdet.data(), vec[i].data()), x.second );
-	    //bookEnergyLosses1D( histos_PXB_dedx, ibooker, i_nbins_dedx, f_range_dedx, "dEdx", Form("%s_%s", str_subdet.data(), "test"), x.second );
-	    //my_map1[vctr_particles[i]].push_back(histos_PXB_dedx);
+	    bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dedx, ibooker, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "p", "dEdx", Form("%s_%s", str_subdet.data(), vec[i].data()));
+	    bookEnergyLossesRelatedInfo1D( histos_PXB_dedx, ibooker, i_nbins_dedx, f_range_dedx, "dEdx", Form("%s_%s", str_subdet.data(), vec[i].data()), x.second );
 	    my_map1[vec[i]].push_back(histos_PXB_dedx);
 	    my_map2[vec[i]].push_back(histos_PDG_PXF_dedx);
-	    /*
-	    if (vctr_particles[i].compare("protons")==0)
-	    {
-	      //if(!b_initialize_EnergyLossesRelatedInfo2D){
-	      histos_protons_p_dedx_.push_back(histos_PDG_PXF_dedx);
-	      histos_particles_p_dedx.push_back(histos_PDG_PXF_dedx);
-	      
-	      
-		//b_initialize_EnergyLossesRelatedInfo2D = true;
-		//	      }
-	      histos_protons_dedx_.push_back(histos_PXB_dedx);
-
-	    }
-	    else if (vctr_particles[i].compare("pions")==0)
-	    {
-	      //if(!b_initialize_EnergyLossesRelatedInfo2D){
-		histos_pions_p_dedx_.push_back(histos_PDG_PXF_dedx);
-		//b_initialize_EnergyLossesRelatedInfo2D = true;
-		// }
-	      histos_pions_dedx_.push_back(histos_PXB_dedx);
-	    }
-	    */
 	}
     }
     std::cout<<my_map1.size()<<std::endl;
 
-    /*It works!
-    typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
-    
-    for( iter iterator = my_map.begin(); iterator != my_map.end(); ++iterator ) {
-      MyClassSetVector foo = iterator->second;
-      
-      //std::string Key = iter.first;
-      //iterator->first = key
-      std::cout<<" "<<iterator->first<<std::endl;    
-      
-      for (unsigned i =0; i<foo.size(); i++) {
-	foo[0][0]->Fill(0);
-	//std::cout <<  " " << foo[0][0]->Fill(0) << std::endl;
-      }
-    }
-    */
-    
-    //my_map["protons"]
 }
 
 
 void 
-DemoAnalyzer::bookEnergyLosses1D( std::vector<MonitorElement*>& histos_det_dedx, DQMStore::IBooker & ibooker, int nBins, float range, 
-				  const TString &var, const TString &det, unsigned int nHistos )
+DemoAnalyzer::bookEnergyLossesRelatedInfo1D( std::vector<MonitorElement*>& histos_det_dedx, DQMStore::IBooker & ibooker, int nBins, float range, 
+					     const TString &var, const TString &det, unsigned int nHistos )
 {
-    if (!bins_p.empty()) {
+    if (!bins_p.empty()) 
+    {
 
-    for(unsigned int iHist = 0; iHist < nHistos; iHist++) 
-      histos_det_dedx.push_back( ibooker.book1D( Form( "SimHit_%s_%s_%u", var.Data(), det.Data(), iHist+1 ) ,
-						 Form( "(%s,%s);%s;", bins_p[iHist].data(), bins_p[iHist+1].data(), var.Data() ) ,
-						 nBins , 0. , range ) );
+        for(unsigned int iHist = 0; iHist < nHistos; iHist++) 
+	{
+	    histos_det_dedx.push_back( ibooker.book1D( Form( "SimHit_%s_%s_%u", var.Data(), det.Data(), iHist+1 ) ,
+						       Form( "(%s,%s);%s;", bins_p[iHist].data(), bins_p[iHist+1].data(), var.Data() ) ,
+						       nBins , 0. , range ) );
+	}
     }
 }
 
@@ -818,13 +599,12 @@ DemoAnalyzer::bookEnergyLosses1D( std::vector<MonitorElement*>& histos_det_dedx,
 void 
 DemoAnalyzer::bookEnergyLossesRelatedInfo2D( std::vector<MonitorElement*>& histos_PDG_det_dedx, DQMStore::IBooker & ibooker,
 					     int nBinsX, float rangeX, int nBinsY, float rangeY, 
-					     const TString &varX, const TString &varY, const TString &det, unsigned int nHistos )
+					     const TString &varX, const TString &varY, const TString &det )
 {
     //TString x_Axis_Label  = ( (TObjString*) (det.Tokenize("_")->At(0)))->GetString().Data();
-    for(unsigned int iHist = 0; iHist < nHistos; iHist++) 
-      histos_PDG_det_dedx.push_back( ibooker.book2D( Form( "SimHit_%s_%s_%s_%u", varY.Data(), varX.Data(), det.Data(), iHist+1 ) ,
-						     Form( ";%s;%s", varX.Data(), varY.Data() ) ,
-						     nBinsX , 0. , rangeX, nBinsY , 0.0 ,  rangeY ) );
+    histos_PDG_det_dedx.push_back( ibooker.book2D( Form( "SimHit_%s_%s_%s", varY.Data(), varX.Data(), det.Data() ) ,
+						   Form( ";%s;%s", varX.Data(), varY.Data() ) ,
+						   nBinsX , 0. , rangeX, nBinsY , 0.0 ,  rangeY ) );
 
 }
 
@@ -842,36 +622,19 @@ void DemoAnalyzer::bookHistograms(DQMStore::IBooker & ibooker, edm::Run const & 
 
      
      std::vector<std::string> pdgIds; // these are the ones we really use
-     if (!pdts_.empty()) {
-       //MyQueue<std::string> str;
-       //MyQueue<int> str1;
-       for (std::vector<PdtEntry>::iterator itp = pdts_.begin(), edp = pdts_.end(); itp != edp; ++itp) {
-	 itp->setup(iSetup); // decode string->pdgId and vice-versa
-       //pdgIds_.push_back(std::abs(itp->pdgId()));
-       pdgIds.push_back(itp->name());
-       //std::string pdg (itp->name());
-       //if (!pdg.empty())
-       //{
-       //std::cout<<" meta1! "<<std::endl;
-       //str.Add(itp->name());
-       //}else{
-       //str1.Add(std::abs(itp->pdgId()));
-       //}
-       //}
-       //if (str.Print()!=0){
-       //std::cout<<" meta "<<std::endl;
-       //bookHistosPerParticle(str, ibooker);
-       //}
-       //else {
-       //std::cout<<" meta! "<<std::endl;
-       //bookHistosPerParticle(str, ibooker);
-       //}
-     //if (!particles_.empty()) {
-       }
-       }
-     else{
-       pdgIds.push_back("all");
+     if (!pdts_.empty()) 
+     {
+         for (std::vector<PdtEntry>::iterator itp = pdts_.begin(), edp = pdts_.end(); itp != edp; ++itp) 
+	 {
+	     itp->setup(iSetup); // decode string->pdgId and vice-versa
+	     pdgIds.push_back(itp->name());
+	 }
      }
+     else
+     {
+         pdgIds.push_back("all");
+     }
+
      bookHistosPerParticle(pdgIds, ibooker);
 	  
 }
@@ -917,6 +680,34 @@ DemoAnalyzer::removeWhiteSpaces( std::string &strg )
 	}
     }
 }
+
+void
+DemoAnalyzer::parseFormating1DConfiguration(const std::vector<edm::ParameterSet>& selectEventPSets)
+{
+    for (unsigned int iname=0; iname< selectEventPSets.size(); ++iname)
+    {
+        selectedProcessPaths_.title=selectEventPSets[iname].getParameter<std::string>("title");
+	selectedProcessPaths_.name=selectEventPSets[iname].getParameter<std::string>("name");
+	selectedProcessPaths_.labelx=selectEventPSets[iname].getUntrackedParameter<std::string>("labelx");
+	selectedProcessPaths_.labely=selectEventPSets[iname].getUntrackedParameter<std::string>("labely");
+	selectedProcessPaths_.rangex=selectEventPSets[iname].getUntrackedParameter<std::vector<double> >("rangex");
+    }
+}
+
+void
+DemoAnalyzer::parseFormating2DConfiguration(const std::vector<edm::ParameterSet>& selectEventPSets)
+{
+    for (unsigned int iname=0; iname< selectEventPSets.size(); ++iname)
+    {
+        selectedProcessPaths2_.title=selectEventPSets[iname].getParameter<std::string>("title");
+	selectedProcessPaths2_.name=selectEventPSets[iname].getParameter<std::string>("name");
+	selectedProcessPaths2_.labelx=selectEventPSets[iname].getUntrackedParameter<std::string>("labelx");
+	selectedProcessPaths2_.labely=selectEventPSets[iname].getUntrackedParameter<std::string>("labely");
+	selectedProcessPaths2_.rangex=selectEventPSets[iname].getUntrackedParameter<std::vector<double> >("rangex");
+	selectedProcessPaths2_.rangey=selectEventPSets[iname].getUntrackedParameter<std::vector<double> >("rangey");
+    }
+}
+
 
 //define this as a plug-in
 DEFINE_FWK_MODULE(DemoAnalyzer);
