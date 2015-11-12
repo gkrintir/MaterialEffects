@@ -17,8 +17,19 @@ DQMExample_Step1 = cms.EDAnalyzer('DemoAnalyzer',
         #cms.InputTag("g4SimHits", "TrackerHitsTOBLowTof"), 
         #cms.InputTag("g4SimHits", "TrackerHitsTOBHighTof")
         ),
-     particles = cms.untracked.string('protons/pions'), #token(e.g. :) could be everything other a number, a letter and an underscore
+     particles = cms.untracked.string('pions/'), #token(e.g. :) could be everything other a number, a letter and an underscore
+     #particleTypes = cms.untracked.vint32(2212),
      bins_p = cms.untracked.vstring('2.1','1.2', '3.4', '.8', '5.2', '.4'),
+     DaughterIDs =  cms.untracked.vdouble(2.1, 1.2, 3.4, .8, 5.2, .4),
+     formating = cms.VPSet (
+       cms.PSet(
+         name = cms.string('bestzmass'),
+         rebin = cms.untracked.int32(20),
+         labelx = cms.untracked.string("M_{l^{+}l^{-}} (GeV/c^{2})"),
+         labely = cms.untracked.string("Events/2GeV/c^{2}"),
+         rangex = cms.untracked.vdouble(60.,120.)
+         ),
+       )                             
     )
 
 

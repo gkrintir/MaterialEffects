@@ -23,6 +23,7 @@
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
 #include "DQMServices/Core/interface/DQMEDAnalyzer.h"
+#include "FWCore/Framework/interface/EDFilter.h"
 #include "DQMServices/Core/interface/MonitorElement.h"
 #include "FWCore/Framework/interface/ESHandle.h"
 #include "FWCore/ServiceRegistry/interface/Service.h"
@@ -32,15 +33,20 @@
 
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 
-
+#include "CommonTools/Utils/interface/StringCutObjectSelector.h"
 #include "DataFormats/TrackReco/interface/Track.h"
 #include "DataFormats/TrackReco/interface/TrackFwd.h"
 #include "DataFormats/TrackerCommon/interface/TrackerTopology.h"
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
+#include "DataFormats/HepMCCandidate/interface/GenParticleFwd.h"
 #include "SimDataFormats/TrackingHit/interface/PSimHit.h"
 #include "SimDataFormats/Track/interface/SimTrack.h"
 #include "SimDataFormats/Track/interface/SimTrackContainer.h"
+#include "HepPDT/defs.h"
+#include "HepPDT/TableBuilder.hh"
+#include "HepPDT/ParticleDataTable.hh"
 #include "SimGeneral/HepPDTRecord/interface/PdtEntry.h"
+#include "SimGeneral/HepPDTRecord/interface/ParticleDataTable.h"
 
 #include "DataFormats/Math/interface/Vector3D.h"
 #include "Geometry/Records/interface/IdealGeometryRecord.h"
@@ -64,6 +70,35 @@
 // class declaration
 // migrate to:https://twiki.cern.ch/twiki/bin/viewauth/CMS/ThreadedDQM
 //https://github.com/cirkovic/my-cmssw/blob/master/DQMOffline/RecoB/plugins/BTagPerformanceAnalyzerOnData.cc
+//https://github.com/cms-tau-pog/HighPtTau_539/blob/master/PhysicsTools/PatAlgos/plugins/PATGenCandsFromSimTracksProducer.cc
+
+struct SelectedProcessPaths
+{
+    std::string processName;
+    int rebin;
+    std::vector<std::string> paths;
+};
+
+
+template <typename T>
+class MyQueue
+{
+std::vector<T> data;
+public:
+void Add(T const &);
+void Remove();
+unsigned int Print();
+};
+
+template <typename T> void MyQueue<T> ::Add(T const &d)
+{
+data.push_back(d);
+}
+
+template <typename T> unsigned int MyQueue<T> ::Print()
+{
+return data.size();
+}
 
 class DemoAnalyzer : public DQMEDAnalyzer {
    public:
@@ -81,8 +116,10 @@ class DemoAnalyzer : public DQMEDAnalyzer {
   
       // ----------member data ---------------------------
       bool processFastSim_;
-      void bookHistosPerParticle( const std::string& particles,  DQMStore::IBooker & ibooker );
-
+      //void bookHistosPerParticle( const std::string& particles,  DQMStore::IBooker & ibooker );
+      template <typename T> 
+      //void bookHistosPerParticle(MyQueue<T> & vec,  DQMStore::IBooker & ibooker);
+      void bookHistosPerParticle(std::vector<T> & vec,  DQMStore::IBooker & ibooker);
 
   
       void bookEnergyLossesRelatedInfo2D( std::vector<MonitorElement*>&, DQMStore::IBooker & ibooker,
@@ -96,10 +133,11 @@ class DemoAnalyzer : public DQMEDAnalyzer {
       std::string particles_;
       std::vector<std::string> bins_E;
       std::vector<std::string> bins_p;
-
+    
+      std::vector<double> bins_test_;
       std::vector<float> bins1_;
-  
-  
+      std::vector<PdtEntry> pdts_;   // these are needed before we get the EventSetup
+  //ESHandle<HepPDT::ParticleDataTable> fPDGTable ;
   /*
       edm::InputTag simHitsTag_PXB_Lowtof_;
       edm::InputTag simHitsTag_PXB_Hightof_;
@@ -138,12 +176,13 @@ class DemoAnalyzer : public DQMEDAnalyzer {
       typedef std::map<std::string,  MyClassSetVector > MyClassSetMap;
       MyClassSetMap my_map1;
       MyClassSetMap my_map2;
+  
+      typedef StringCutObjectSelector<reco::GenParticle> StrFilter;
+      std::auto_ptr<StrFilter> filter_;
 
-
-  //typedef typename std::vector<T>::iterator iterator;
+      //typedef typename std::vector<T>::iterator iterator;
 
       std::vector<std::vector<MonitorElement*> > histos_protons_dedx_;
-  
       std::vector<std::vector<MonitorElement*> > histos_pions_p_dedx_;
       std::vector<std::vector<MonitorElement*> > histos_pions_dedx_;
 
@@ -246,8 +285,8 @@ DemoAnalyzer::DemoAnalyzer(const edm::ParameterSet& iConfig):
   particles_(),
   bins_E(),
   bins_p()
-  //fNbEvtToPrint(iConfig.getUntrackedParameter<std::vector<float> >("NbEventsToPrint"))
-  
+  //bins_test(iConfig.getUntrackedParameter<std::vector<double> >("NbEventsToPrint",0.))
+  //bins_test(2,static_cast<float>(0.))
 
   //fs_()
 
@@ -299,10 +338,10 @@ DemoAnalyzer::DemoAnalyzer(const edm::ParameterSet& iConfig):
     bookHistosPerParticle("protons:pions");
   */
     processFastSim_ = iConfig.getUntrackedParameter<bool>("processFastSim");
-    if (processFastSim_)
-      trackerContainers_.push_back(simHitsTag_[0]);
+    //if (processFastSim_)
+    // trackerContainers_.push_back(simHitsTag_[0]);
     
-    else {
+    //else {
       for (unsigned int i_subDet=0; i_subDet<simHitsTag_.size(); ++i_subDet){
         trackerContainers_.push_back(simHitsTag_[i_subDet]);
 	/*
@@ -320,12 +359,38 @@ DemoAnalyzer::DemoAnalyzer(const edm::ParameterSet& iConfig):
 	*/
       }
 
+      //}
+
+
+    // Possibly allow a list of particle types
+    if (iConfig.exists("particleTypes")) 
+    {
+      //std::vector<PdtEntry> defdauID1;
+	 //defdauID1.push_back('');
+    pdts_ = iConfig.getUntrackedParameter<std::vector<PdtEntry> >("particleTypes");
+    }
+    // Possibly allow a string cut
+    if (iConfig.existsAs<std::string>("filter")) 
+    {
+        std::string filter = iConfig.getParameter<std::string>("filter");
+        if (!filter.empty()) 
+	{
+ 	    filter_ = std::auto_ptr<StrFilter>(new StrFilter(filter));
+        }
     }
 
     particles_ = iConfig.getUntrackedParameter <std::string > ("particles");
     bins_E = iConfig.getUntrackedParameter <std::vector <std::string> > ("bins_E", std::vector<std::string>());
     bins_p = iConfig.getUntrackedParameter <std::vector <std::string> > ("bins_p", std::vector<std::string>());
 
+    std::vector<double> defdauID;
+    defdauID.push_back(0);
+    defdauID.push_back(0);
+    defdauID.push_back(0);
+    bins_test_ = iConfig.getUntrackedParameter< std::vector<double> >("DaughterIDs"); //iConfig.getUntrackedParameter <std::vector <float> > ("bins_test", defdauID);
+    std::cout << " !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! " << bins_test_[0]<< std::endl;
+    sort(bins_test_.begin(),bins_test_.end());
+    
     //if (!bins_p.empty()) 
     if (iConfig.exists("bins_p")) {
       sort(bins_p.begin(),bins_p.end());	
@@ -342,6 +407,13 @@ DemoAnalyzer::DemoAnalyzer(const edm::ParameterSet& iConfig):
       std::cout << ' ' << *it;
     */
 
+    if (iConfig.exists("formating"))
+    {
+        const std::vector<edm::ParameterSet>& selectEventPSets = iConfig.getParameter<std::vector<edm::ParameterSet>>("formating");
+	for (unsigned int iname=0; iname< selectEventPSets.size(); ++iname)
+	  std::cout << " !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! " << selectEventPSets[iname]<< std::endl;
+	
+    }
 }
 
 DemoAnalyzer::~DemoAnalyzer()
@@ -374,54 +446,23 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     << std::endl;
 #endif
 
-     using namespace edm;
+    using namespace edm;
 
-    //generator level particles
-    Handle<reco::GenParticleCollection> genParticles;
-    iEvent.getByLabel("genParticles", genParticles);
-    /*
-    for(unsigned int iPart = 0; iPart < genParticles->size(); ++ iPart) 
-    {
-        const reco::GenParticle & mPart = (*genParticles)[iPart];
-	h_Genpart_Mother_Pt_->Fill(mPart.pt());
-	size_t n = mPart.numberOfDaughters();
-	for(unsigned int jPart = 0; jPart < n; ++ jPart) 
-        {
-	    const reco::Candidate * dPart = mPart.daughter(jPart);
-	    h_Genpart_Daughter_Pt_->Fill(dPart->pt());
-	}
-    }
-   
-    ESHandle< TrackerGeometry > TG;
-    iSetup.get<TrackerDigiGeometryRecord>().get(TG);
-    const TrackerGeometry *theTrackerGeometry = TG.product ();
-    */
-
-    
     // Retrieve tracker topology from geometry
     ESHandle< TrackerTopology > tTopoHandle;
     iSetup.get<IdealGeometryRecord>().get(tTopoHandle);
     const TrackerTopology* const tTopo = tTopoHandle.product();
-    
 
     //Retrieve the Monte Carlo truth Particles(SimTracks)
     Handle< SimTrackContainer > simTracksHandle;
     iEvent.getByLabel(trackerContainers_[0].label(),simTracksHandle); 
     const SimTrackContainer simTracks = *(simTracksHandle.product());
 
-    std::vector<float>::iterator it;
+    std::vector<double>::iterator it;
 
     for ( SimTrackContainer::const_iterator  simTrack = simTracks.begin(); simTrack != simTracks.end(); ++simTrack) 
     {
-      /*
-        h_Track_P_->Fill((*simTrack).momentum().P());
-	h_Track_Pt_->Fill((*simTrack).momentum().Pt());
-	h_Track_Phi_->Fill((*simTrack).momentum().Phi());
-	h_Track_Eta_->Fill((*simTrack).momentum().Eta());
-	h_Track_ID_Track_Pt_->Fill((*simTrack).momentum().Pt(), fabs((*simTrack).type()));
-      */
 	unsigned int i_SimHit_Multiplicity = 0, i_SimHit_Pixels_Multiplicity = 0;
-
 	for (unsigned i=0; i<trackerContainers_.size(); ++i) 
 	{
            Handle<std::vector<PSimHit> > simHitCollection;
@@ -429,7 +470,8 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 	   const std::vector<PSimHit>& simHits = *simHitCollection.product();
 	   if(simHitCollection.isValid()) 
 	   {
-	       for( std::vector<PSimHit>::const_iterator Hits=simHits.begin(); Hits!=simHits.end(); ++Hits) {
+	       for( std::vector<PSimHit>::const_iterator Hits=simHits.begin(); Hits!=simHits.end(); ++Hits) 
+	       {
 	           if((*Hits).trackId() == (*simTrack).trackId()) 
 		   {
 		       i_SimHit_Multiplicity++;
@@ -445,255 +487,81 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 						 TMath::Power( (*Hits).entryPoint().z() - (*Hits).exitPoint().z(), 2), 
 						 1/2.);
 		       
-		       
-		       //float f_dx = TMath::Power(TMath::Power( (*Hits).entryPoint().z() - (*Hits).exitPoint().z(), 2), 
-		       //1/2.);
-		       //const DetId& theDetId = (*Hits).detUnitId();
-		       //const GeomDet* theGeomDet = theTrackerGeometry->idToDet(theDetId);
-		       //const GlobalPoint& globalPoint = theGeomDet->toGlobal (localPoint); 
-		       //std::cout<< globalPoint.x() <<std::endl;
 		       float momentumAtEntry = (*Hits).momentumAtEntry().mag();
-		       std::cout<<momentumAtEntry<<" prin "<<bins1_[1]-bins1_[0]<<" "<<abs((*Hits).particleType())<<std::endl;
-		       //if( momentumAtEntry<TMath::Abs((bins1_[0])) ||  momentumAtEntry>TMath::Abs((bins1_[bins1_.size()-1])) ) continue;
-		       bins1_.push_back(momentumAtEntry);
-		       sort(bins1_.begin(),bins1_.end());	
-		       it=find(bins1_.begin(),bins1_.end(), momentumAtEntry);
-		       auto pos = std::distance(bins1_.begin(), it);
+		       
+		       bins_test_.push_back(momentumAtEntry);
+		       sort(bins_test_.begin(),bins_test_.end());	
+		       it=find(bins_test_.begin(),bins_test_.end(), momentumAtEntry);
+		       auto pos = std::distance(bins_test_.begin(), it);
 		       
 		       if (isub == static_cast<int>(PixelSubdetector::PixelBarrel) || isub == static_cast<int>(PixelSubdetector::PixelEndcap)) 
 		       {
-			 //std::cout<<std::to_string((*Hits).momentumAtEntry().mag()).data()<<std::endl;
-			 
-
-			 //sort(bins_.begin(),bins_.end());
-		       /*
-		           h_Hit_PXBPXF_PerLayer_Multiplicity_->Fill(tTopo->pxbLayer(detId));
-			   h_Hit_Pixels_P_AtEntry_->Fill((*Hits).momentumAtEntry().mag());
-			   h_Hit_PixelDets_dedx_P_AtEntry_->Fill((*Hits).momentumAtEntry().mag(), (*Hits).energyLoss()/f_dx);
-			   h_Hit_PixelDets_dedx_Track_P_->Fill((*simTrack).momentum().P(), (*Hits).energyLoss()/f_dx);
-			   h_Hit_PixelDets_Map_->Fill(theGeomDet->toGlobal((*Hits).localPosition()).z(),
-						      theGeomDet->toGlobal((*Hits).localPosition()).y());
-			   histos_PXB_dedx_[tTopo->pxbLayer(detId)-1]->Fill((*Hits).energyLoss()/f_dx);
-			   histos_PDG_PXB_dedx_[tTopo->pxbLayer(detId)-1]->Fill(abs((*Hits).particleType()), (*Hits).energyLoss()/f_dx);
-			   histos_PDG_PXB_dx_[tTopo->pxbLayer(detId)-1]->Fill(abs((*Hits).particleType()), f_dx);
-			   histos_p_PXB_dedx_[tTopo->pxbLayer(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-			 */
 			   i_SimHit_Pixels_Multiplicity++;
-			   if (abs((*Hits).particleType())==2212)
-			   {  
-			     //histos_protons_p_dedx_[0][tTopo->pxbLayer(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-			     if (pos!=0 && pos<int(bins1_.size()-1)){
-			       std::cout<<momentumAtEntry<<" meta "<<pos<<" meta "<<bins1_.size()<<" "<<(*Hits).particleType()<<std::endl;
-			       //histos_protons_dedx_[0][pos-1]->Fill((*Hits).energyLoss()/f_dx);
-			       typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
-			
-				for( iter iterator = my_map1.begin(); iterator != my_map1.end(); ++iterator ) {
-				  MyClassSetVector foo = iterator->second;
-				  std::cout<<" "<<iterator->first<<std::endl;    
-				  //for (unsigned i =0; i<foo.size(); i++) {
-				  foo[0][pos-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-				  //std::cout <<  " " << foo[0][0]->Fill(0) << std::endl;
-				  //}
-				}
-			       
-			     }
-			     histos_protons_p_dedx_[0][0]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-			     
-			     typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
-    			     for( iter iterator = my_map2.begin(); iterator != my_map2.end(); ++iterator ) {
-			       MyClassSetVector foo = iterator->second;
-			       std::cout<<" "<<iterator->first<<std::endl;    
-			       //for (unsigned i =0; i<foo.size(); i++) {
-				 foo[0][0]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-				 //std::cout <<  " " << foo[0][0]->Fill(0) << std::endl;
-				 //}
-			     }
-			     
-
-			   }
-			   else if (abs((*Hits).particleType())==211)
+			   if (pos!=0 && pos<int(bins_test_.size()-1))
 			   {
-			     //histos_pions_p_dedx_[0][tTopo->pxbLayer(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-			     if (pos!=0 && pos<int(bins1_.size()-1)){
-			       std::cout<<momentumAtEntry<<" meta "<<pos<<" meta "<<bins1_.size()<<" "<<(*Hits).particleType()<<std::endl;
-			       histos_pions_dedx_[0][pos-1]->Fill((*Hits).energyLoss()/f_dx);
-			     }
-			     histos_pions_p_dedx_[0][0]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-
+			       typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
+			     
+			       for( iter iterator = my_map1.begin(); iterator != my_map1.end(); ++iterator ) 
+			       {
+				   MyClassSetVector foo = iterator->second;
+				   std::cout<<" bug1 "<<iterator->first<<std::endl;    
+				   foo[0][pos-1]->Fill((*Hits).energyLoss()/f_dx);
+				   std::cout <<  " bug1 " << foo[0][pos-1]->getBinContent(1) << std::endl;
+			       }
+			     
 			   }
-			   			   
+			   typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
+			   for( iter iterator = my_map2.begin(); iterator != my_map2.end(); ++iterator ) {
+			     MyClassSetVector foo = iterator->second;
+			     std::cout<<" bug2 "<<iterator->first<<std::endl;    
+			     foo[0][0]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
+			     std::cout <<  " bug2 " << foo[0][0]->getBinContent(1) << std::endl;
+			   }
+			   
 		       }
-
 		       else if (isub == StripSubdetector::TIB || isub == StripSubdetector::TOB || 
 				isub == StripSubdetector::TID || isub == StripSubdetector::TEC )
-			 {
-			   //if(momentumAtEntry<(bins1_[1]-bins2_[0])) continue;
-
-			    if (abs((*Hits).particleType())==2212)
-			   {  
-			     if (isub == StripSubdetector::TEC && tTopo->tecRing(detId)>=5) {
-			       if (pos!=0 && pos<int(bins1_.size()-1)){
-				 std::cout<<momentumAtEntry<<" meta "<<pos<<" meta "<<bins1_.size()<<" "<<(*Hits).particleType()<<std::endl;
-				 //histos_protons_dedx_[2][pos-1]->Fill((*Hits).energyLoss()/f_dx);
-				 typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
-				 
-				 for( iter iterator = my_map1.begin(); iterator != my_map1.end(); ++iterator ) {
-				   MyClassSetVector foo = iterator->second;
-				   std::cout<<" "<<iterator->first<<std::endl;    
-				   //for (unsigned i =0; i<foo.size(); i++) {
-				   foo[2][pos-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-				   //std::cout <<  " " << foo[0][0]->Fill(0) << std::endl;
-				   //}
-				}
-			       }
-			       histos_protons_p_dedx_[2][0]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-			     }
-			     
-			     else {
-			       if (pos!=0 && pos<int(bins1_.size()-1)){
-				 std::cout<<momentumAtEntry<<" meta "<<pos<<" meta "<<bins1_.size()<<" "<<(*Hits).particleType()<<std::endl;
-				 //histos_protons_dedx_[1][pos-1]->Fill((*Hits).energyLoss()/f_dx);
-				  typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
-				  for( iter iterator = my_map1.begin(); iterator != my_map1.end(); ++iterator ) {
-				  MyClassSetVector foo = iterator->second;
-				  std::string particle = iterator->first;
-				  std::cout<<" "<<iterator->first<<std::endl;    
-				  //for (unsigned i =0; i<foo.size(); i++) {
-				  if (particle.compare("protons")==0)
-				    foo[1][pos-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-				  //std::cout <<  " " << foo[0][0]->Fill(0) << std::endl;
-				  //}
-				  }
-			       histos_protons_p_dedx_[1][0]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-			       }
-			     }
-			   }
-			   else if (abs((*Hits).particleType())==211)
+		       {
+			   if (isub == StripSubdetector::TEC && tTopo->tecRing(detId)>=5) 
 			   {
-			     //histos_pions_p_dedx_[0][tTopo->pxbLayer(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-			     if (isub == StripSubdetector::TEC && tTopo->tecRing(detId)>=5){
-			       if (pos!=0 && pos<int(bins1_.size()-1)){
-				 std::cout<<momentumAtEntry<<" meta "<<pos<<" meta "<<bins1_.size()<<" "<<(*Hits).particleType()<<std::endl;
-				 //histos_pions_dedx_[2][pos-1]->Fill((*Hits).energyLoss()/f_dx);
-				  typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
-				  for( iter iterator = my_map1.begin(); iterator != my_map1.end(); ++iterator ) {
-				  MyClassSetVector foo = iterator->second;
-				  std::cout<<" "<<iterator->first<<std::endl;    
-				  //for (unsigned i =0; i<foo.size(); i++) {
-				  foo[2][pos-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-				  //std::cout <<  " " << foo[0][0]->Fill(0) << std::endl;
-				  //}
-				  }
+			       if (pos!=0 && pos<int(bins_test_.size()-1))
+			       {
+				   std::cout<<momentumAtEntry<<" meta "<<pos<<" meta "<<bins_test_.size()<<" "<<(*Hits).particleType()<<std::endl;
+				   typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
+			       
+				   for( iter iterator = my_map1.begin(); iterator != my_map1.end(); ++iterator ) 
+				   {
+				       MyClassSetVector foo = iterator->second;
+				       std::cout<<" bug3 "<<iterator->first<<std::endl;    
+				       foo[2][pos-1]->Fill((*Hits).energyLoss()/f_dx);
+				       std::cout <<  " bug3 " << foo[2][pos-1]->getBinContent(1) << std::endl;
+				   }
 			       }
-				  histos_pions_p_dedx_[2][0]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-			     }
-			     else {
-			       if (pos!=0 && pos<int(bins1_.size()-1)){
-				 std::cout<<momentumAtEntry<<" meta "<<pos<<" meta "<<bins1_.size()<<" "<<(*Hits).particleType()<<std::endl;
-				 histos_pions_dedx_[1][pos-1]->Fill((*Hits).energyLoss()/f_dx);
-			       }
-			       histos_pions_p_dedx_[1][0]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-			     }
 			   }
-			 }
-		   
-		   bins1_.erase(std::remove(bins1_.begin(), bins1_.end(), momentumAtEntry), bins1_.end());
+			   
+			   else 
+			   {
+			       if (pos!=0 && pos<int(bins_test_.size()-1))
+			       {
+				   typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
+				   for( iter iterator = my_map1.begin(); iterator != my_map1.end(); ++iterator ) 
+				   {
+				       MyClassSetVector foo = iterator->second;
+				       std::cout<<" bug4 "<<iterator->first<<std::endl;    
+				       foo[1][pos-1]->Fill((*Hits).energyLoss()/f_dx);
+				       std::cout <<  " bug4 " << foo[1][pos-1]->getBinContent(1) << std::endl;
+				   }
+			       }
+			   }
+		       }
+		       
+		       bins_test_.erase(std::remove(bins_test_.begin(), bins_test_.end(), momentumAtEntry), bins_test_.end());
 		   }
 	       }
 	   }
 	}
     }
-    /*
-		       else if (isub == static_cast<int>(PixelSubdetector::PixelEndcap)) 
-		       {
-			 
-			   h_Hit_PXBPXF_PerLayer_Multiplicity_->Fill(3 + tTopo->pxfDisk(detId));
-			   h_Hit_Pixels_P_AtEntry_->Fill((*Hits).momentumAtEntry().mag());
-			   h_Hit_PixelDets_dedx_P_AtEntry_->Fill((*Hits).momentumAtEntry().mag(), (*Hits).energyLoss()/f_dx);
-			   h_Hit_PixelDets_dedx_Track_P_->Fill((*simTrack).momentum().P(), (*Hits).energyLoss()/f_dx);
-			   h_Hit_PixelDets_Map_->Fill(theGeomDet->toGlobal((*Hits).localPosition()).z(),
-						      theGeomDet->toGlobal((*Hits).localPosition()).y());
-			   histos_PXF_dedx_[tTopo->pxfDisk(detId)-1]->Fill((*Hits).energyLoss()/f_dx);
-			   histos_PDG_PXF_dedx_[tTopo->pxfDisk(detId)-1]->Fill(abs((*Hits).particleType()), (*Hits).energyLoss()/f_dx);
-			   histos_PDG_PXF_dx_[tTopo->pxfDisk(detId)-1]->Fill(abs((*Hits).particleType()), f_dx);
-			   histos_p_PXF_dedx_[tTopo->pxfDisk(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-			 
-			   if (abs((*Hits).particleType())==2212)
-			   {
-                               histos_protons_p_dedx_[1][tTopo->pxfDisk(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-			   }
-                           else if (abs((*Hits).particleType())==211)
-			   {
-			       histos_pions_p_dedx_[1][tTopo->pxfDisk(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-			   }
-
-			   i_SimHit_Pixels_Multiplicity++;
-		       }
-		   }
-	       }
-	   }
-	}
-    }
-
-		       else if (isub == StripSubdetector::TIB) 
-		       {
-		           h_Hit_Strips_P_AtEntry_->Fill((*Hits).momentumAtEntry().mag());
-			   h_Hit_StripDets_dedx_P_AtEntry_->Fill((*Hits).momentumAtEntry().mag(), (*Hits).energyLoss()/f_dx);
-			   h_Hit_StripDets_dedx_Track_P_->Fill((*simTrack).momentum().P(), (*Hits).energyLoss()/f_dx);
-			   h_Hit_StripDets_Map_->Fill(theGeomDet->toGlobal((*Hits).localPosition()).z(),
-						      theGeomDet->toGlobal((*Hits).localPosition()).y());
-			   histos_TIB_dedx_[tTopo->tibLayer(detId)-1]->Fill((*Hits).energyLoss()/f_dx);
-			   histos_PDG_TIB_dedx_[tTopo->tibLayer(detId)-1]->Fill(abs((*Hits).particleType()), (*Hits).energyLoss()/f_dx);
-			   histos_PDG_TIB_dx_[tTopo->tibLayer(detId)-1]->Fill(abs((*Hits).particleType()), f_dx);
-			   histos_p_TIB_dedx_[tTopo->tibLayer(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-		       }
-		       else if (isub == StripSubdetector::TOB) 
-		       {
-			   h_Hit_Strips_P_AtEntry_->Fill((*Hits).momentumAtEntry().mag());
-			   h_Hit_StripDets_dedx_P_AtEntry_->Fill((*Hits).momentumAtEntry().mag(), (*Hits).energyLoss()/f_dx);
-			   h_Hit_StripDets_dedx_Track_P_->Fill((*simTrack).momentum().P(), (*Hits).energyLoss()/f_dx);
-			   h_Hit_StripDets_Map_->Fill(theGeomDet->toGlobal((*Hits).localPosition()).z(),
-						      theGeomDet->toGlobal((*Hits).localPosition()).y());
-			   histos_TOB_dedx_[tTopo->tobLayer(detId)-1]->Fill((*Hits).energyLoss()/f_dx); 
-			   histos_PDG_TOB_dedx_[tTopo->tobLayer(detId)-1]->Fill(abs((*Hits).particleType()), (*Hits).energyLoss()/f_dx);
-			   histos_PDG_TOB_dx_[tTopo->tobLayer(detId)-1]->Fill(abs((*Hits).particleType()), f_dx);
-			   histos_p_TOB_dedx_[tTopo->tobLayer(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-		       }
-		       else if (isub == StripSubdetector::TID) 
-		       {
-			   h_Hit_Strips_P_AtEntry_->Fill((*Hits).momentumAtEntry().mag());
-			   h_Hit_StripDets_dedx_P_AtEntry_->Fill((*Hits).momentumAtEntry().mag(), (*Hits).energyLoss()/f_dx);
-			   h_Hit_StripDets_dedx_Track_P_->Fill((*simTrack).momentum().P(), (*Hits).energyLoss()/f_dx);
-			   h_Hit_StripDets_Map_->Fill(theGeomDet->toGlobal((*Hits).localPosition()).z(),
-						      theGeomDet->toGlobal((*Hits).localPosition()).y());
-			   histos_TID_dedx_[tTopo->tidRing(detId)-1]->Fill((*Hits).energyLoss()/f_dx);
-			   histos_PDG_TID_dedx_[tTopo->tidRing(detId)-1]->Fill(abs((*Hits).particleType()), (*Hits).energyLoss()/f_dx);
-			   histos_PDG_TID_dx_[tTopo->tidRing(detId)-1]->Fill(abs((*Hits).particleType()), f_dx);
-			   histos_p_TID_dedx_[tTopo->tidRing(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-		       }
-		       else if (isub == StripSubdetector::TEC) 
-		       {
-			   h_Hit_Strips_P_AtEntry_->Fill((*Hits).momentumAtEntry().mag());
-			   h_Hit_StripDets_dedx_P_AtEntry_->Fill((*Hits).momentumAtEntry().mag(), (*Hits).energyLoss()/f_dx);
-			   h_Hit_StripDets_dedx_Track_P_->Fill((*simTrack).momentum().P(), (*Hits).energyLoss()/f_dx);
-			   h_Hit_StripDets_Map_->Fill(theGeomDet->toGlobal((*Hits).localPosition()).z(),
-						      theGeomDet->toGlobal((*Hits).localPosition()).y());
-			   histos_TEC_dedx_[tTopo->tecRing(detId)-1]->Fill((*Hits).energyLoss()/f_dx);
-			   histos_PDG_TEC_dedx_[tTopo->tecRing(detId)-1]->Fill(abs((*Hits).particleType()), (*Hits).energyLoss()/f_dx);
-			   histos_PDG_TEC_dx_[tTopo->tecRing(detId)-1]->Fill(abs((*Hits).particleType()), f_dx);
-			   histos_p_TEC_dedx_[tTopo->tecRing(detId)-1]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-		       }
-		   }// if((*Hits).trackId() == (*simTrack).trackId())
-	       }// Hits!=simHits.end()
-	   }// simHitCollection.isValid()
-	} // trackerContainers
-	h_Hit_PixelDets_Multiplicity_->Fill(i_SimHit_Pixels_Multiplicity) ;
-	h_Hit_StripDets_Multiplicity_->Fill(i_SimHit_Multiplicity-i_SimHit_Pixels_Multiplicity);
-	h_Hit_PixelDets_Multiplicity_Track_P_->Fill(i_SimHit_Pixels_Multiplicity, (*simTrack).momentum().P());
-	h_Hit_StripDets_Multiplicity_Track_P_->Fill(i_SimHit_Multiplicity-i_SimHit_Pixels_Multiplicity, (*simTrack).momentum().P());
-    }// simTrack != simTracks.end()
-    h_Track_Multiplicity_->Fill(simTracks.size());
-     */    
+    
 #ifdef THIS_IS_AN_EVENT_EXAMPLE
     Handle<ExampleData> pIn;
     iEvent.getByLabel("example",pIn);
@@ -724,6 +592,7 @@ DemoAnalyzer::endJob()
 void 
 DemoAnalyzer::dqmBeginRun(edm::Run const&, edm::EventSetup const&)
 {
+  
 }
 
 
@@ -816,9 +685,9 @@ DemoAnalyzer::bookHistosPerDetector()
 
 }
 */
-
+template <typename T> 
 void 
-DemoAnalyzer::bookHistosPerParticle(const std::string& str_particles,  DQMStore::IBooker & ibooker)
+DemoAnalyzer::bookHistosPerParticle(std::vector<T> & vec,  DQMStore::IBooker & ibooker)
 {
 
 
@@ -844,6 +713,7 @@ DemoAnalyzer::bookHistosPerParticle(const std::string& str_particles,  DQMStore:
     float  f_range_dx = 1e-1;
     */
     //
+    /*
     std::vector<std::string> vctr_particles;
     std::set<char> token;
     identifyToken(token, str_particles);
@@ -853,15 +723,15 @@ DemoAnalyzer::bookHistosPerParticle(const std::string& str_particles,  DQMStore:
       removeWhiteSpaces(s_particle);
       vctr_particles.push_back(s_particle);
     }
-  
+    */
     //    std::cout<<vctr_particles.size()<<std::endl;
     //
     MyClassSetVector histos_particles_p_dedx;
     //MyClassSetMap my_map;
     
 
-    for (unsigned int i=0; i<vctr_particles.size(); ++i) 
-    {
+    for (unsigned int i=0; i<vec.size(); ++i) 
+      {
       //bool b_initialize_EnergyLossesRelatedInfo2D = false;
 	//bool b_store_protons_EnergyLossesRelatedInfo2D= false;
 	//bool b_store_pions_EnergyLossesRelatedInfo2D= false;
@@ -875,18 +745,23 @@ DemoAnalyzer::bookHistosPerParticle(const std::string& str_particles,  DQMStore:
 	    str_subdet.append(x.first);
 
 	    //if(!b_initialize_EnergyLossesRelatedInfo2D) {
-	    bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dedx, ibooker, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "p", "dEdx", Form("%s_%s", str_subdet.data(), vctr_particles[i].data()), 1 );
+	    bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dedx, ibooker, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "p", "dEdx", Form("%s_%s", str_subdet.data(), vec[i].data()), 1 );
+	    //bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dedx, ibooker, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "p", "dEdx", Form("%s_%s", str_subdet.data(), "test"), 1 );
 	      // }
 
-	    bookEnergyLosses1D( histos_PXB_dedx, ibooker, i_nbins_dedx, f_range_dedx, "dEdx", Form("%s_%s", str_subdet.data(), vctr_particles[i].data()), x.second );
-	    my_map1[vctr_particles[i]].push_back(histos_PXB_dedx);
+	    bookEnergyLosses1D( histos_PXB_dedx, ibooker, i_nbins_dedx, f_range_dedx, "dEdx", Form("%s_%s", str_subdet.data(), vec[i].data()), x.second );
+	    //bookEnergyLosses1D( histos_PXB_dedx, ibooker, i_nbins_dedx, f_range_dedx, "dEdx", Form("%s_%s", str_subdet.data(), "test"), x.second );
+	    //my_map1[vctr_particles[i]].push_back(histos_PXB_dedx);
+	    my_map1[vec[i]].push_back(histos_PXB_dedx);
+	    my_map2[vec[i]].push_back(histos_PDG_PXF_dedx);
+	    /*
 	    if (vctr_particles[i].compare("protons")==0)
 	    {
 	      //if(!b_initialize_EnergyLossesRelatedInfo2D){
 	      histos_protons_p_dedx_.push_back(histos_PDG_PXF_dedx);
 	      histos_particles_p_dedx.push_back(histos_PDG_PXF_dedx);
 	      
-	      my_map2[vctr_particles[i]].push_back(histos_PDG_PXF_dedx);
+	      
 		//b_initialize_EnergyLossesRelatedInfo2D = true;
 		//	      }
 	      histos_protons_dedx_.push_back(histos_PXB_dedx);
@@ -900,6 +775,7 @@ DemoAnalyzer::bookHistosPerParticle(const std::string& str_particles,  DQMStore:
 		// }
 	      histos_pions_dedx_.push_back(histos_PXB_dedx);
 	    }
+	    */
 	}
     }
     std::cout<<my_map1.size()<<std::endl;
@@ -953,40 +829,51 @@ DemoAnalyzer::bookEnergyLossesRelatedInfo2D( std::vector<MonitorElement*>& histo
 }
 
 
-/*
-void 
-DemoAnalyzer::bookEnergyLossesRelatedInfo2D( std::vector<TH2F*>& histos_PDG_det_dedx, 
-					     int nBinsX, float rangeX, int nBinsY, float rangeY, 
-					     const TString &var, const TString &det )
-{
-    TString x_Axis_Label  = ( (TObjString*) (det.Tokenize("_")->At(0)))->GetString().Data();
-    int iHist = 0;
-    histos_PDG_det_dedx.push_back( fs_->make<TH2F>(Form( "hist_%s_%u_%s" , det.Data() , iHist+1, var.Data() ) ,
-						   Form( "Sim_Hit_%s_%s_%u;%s;" , var.Data(), det.Data() , iHist+1, x_Axis_Label.Data() ) ,
-						   nBinsX , 0. , rangeX, nBinsY , 0.0 ,  rangeY) );
-    
-}
-
-*/
-
 void DemoAnalyzer::bookHistograms(DQMStore::IBooker & ibooker, edm::Run const & iRun,
 				  edm::EventSetup const & iSetup)
 {
 
      ibooker.cd();
      ibooker.setCurrentFolder("testMaterialEffects");
-     //map_subdet_nlayers_.insert(std::pair<std::string,int>("PXF",2));
-     //map_subdet_nlayers_.insert(std::pair<std::string,int>("PXB",3));
-     map_subdet_nlayers_.insert(std::pair<std::string,int>("Pixels",bins1_.size()-1));
+     
+     map_subdet_nlayers_.insert(std::pair<std::string,int>("Pixels",bins_test_.size()-1));
      map_subdet_nlayers_.insert(std::pair<std::string,int>("StripsNoTEC5to7",bins_p.size()-1));
      map_subdet_nlayers_.insert(std::pair<std::string,int>("StripsOnlyTEC5to7",bins_p.size()-1));
 
-
-     //bookHistosPerParticle("protons:pions", ibooker);
-     if (!particles_.empty()) {
-     bookHistosPerParticle(particles_, ibooker);
+     
+     std::vector<std::string> pdgIds; // these are the ones we really use
+     if (!pdts_.empty()) {
+       //MyQueue<std::string> str;
+       //MyQueue<int> str1;
+       for (std::vector<PdtEntry>::iterator itp = pdts_.begin(), edp = pdts_.end(); itp != edp; ++itp) {
+	 itp->setup(iSetup); // decode string->pdgId and vice-versa
+       //pdgIds_.push_back(std::abs(itp->pdgId()));
+       pdgIds.push_back(itp->name());
+       //std::string pdg (itp->name());
+       //if (!pdg.empty())
+       //{
+       //std::cout<<" meta1! "<<std::endl;
+       //str.Add(itp->name());
+       //}else{
+       //str1.Add(std::abs(itp->pdgId()));
+       //}
+       //}
+       //if (str.Print()!=0){
+       //std::cout<<" meta "<<std::endl;
+       //bookHistosPerParticle(str, ibooker);
+       //}
+       //else {
+       //std::cout<<" meta! "<<std::endl;
+       //bookHistosPerParticle(str, ibooker);
+       //}
+     //if (!particles_.empty()) {
+       }
+       }
+     else{
+       pdgIds.push_back("all");
      }
-          
+     bookHistosPerParticle(pdgIds, ibooker);
+	  
 }
 
 void 
