@@ -30,7 +30,7 @@ DQMExample_Step1 = cms.EDAnalyzer('DemoAnalyzer',
         # Particles with energy smaller than EMin (GeV) are not simulated
         EMin = cms.double(0.0),
         # Protons with energy in excess of this value (GeV) will kept no matter what
-        EProton = cms.double(99999.0)
+        IDs = cms.vint32(2212)
         ),
      formating1D = cms.VPSet (
         cms.PSet(
@@ -38,7 +38,7 @@ DQMExample_Step1 = cms.EDAnalyzer('DemoAnalyzer',
          name = cms.string('bestzmass'),
          labelx = cms.untracked.string("M_{l^{+}l^{-}} (GeV/c^{2})"),
          labely = cms.untracked.string("Events/2GeV/c^{2}"),
-         rangex = cms.untracked.vdouble(60.,120.)
+         rangex = cms.untracked.vdouble(10, 60.,120.)
          )
         ),
      formating2D = cms.VPSet (

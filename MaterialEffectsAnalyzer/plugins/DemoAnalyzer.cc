@@ -26,6 +26,7 @@
 #include "FWCore/Framework/interface/EDFilter.h"
 #include "DQMServices/Core/interface/MonitorElement.h"
 #include "FWCore/Framework/interface/ESHandle.h"
+#include "FWCore/Framework/interface/EventSetup.h"
 #include "FWCore/ServiceRegistry/interface/Service.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
@@ -117,9 +118,10 @@ class DemoAnalyzer : public DQMEDAnalyzer {
 
       void bookEnergyLossesRelatedInfo1D( std::vector<MonitorElement*>&, DQMStore::IBooker & ibooker, int nBins, float range, 
 					  const TString &var, const TString &det, unsigned int nHistos );
-
-      void parseFormating1DConfiguration(const std::vector<edm::ParameterSet>& selectEventPSets);
-      void parseFormating2DConfiguration(const std::vector<edm::ParameterSet>& selectEventPSets);
+      
+      bool passesFilterSelection(std::vector<PSimHit>::const_iterator Hits);
+      void parseHistoFormating1D(const std::vector<edm::ParameterSet>& selectEventPSets);
+      void parseHistoFormating2D(const std::vector<edm::ParameterSet>& selectEventPSets);
    
       std::vector<edm::InputTag> simHitsTag_;
       std::string particles_;
@@ -129,6 +131,8 @@ class DemoAnalyzer : public DQMEDAnalyzer {
       std::vector<double> bins_test_;
       std::vector<float> bins1_;
       std::vector<PdtEntry> pdts_;   // these are needed before we get the EventSetup
+      std::vector<int> pdgIds;
+      edm::ESHandle<HepPDT::ParticleDataTable> fPDGTable ;
 
       //Helper Functions
       void identifyToken(std::set<char> & , const std::string& );
@@ -233,12 +237,12 @@ DemoAnalyzer::DemoAnalyzer(const edm::ParameterSet& iConfig):
     if (iConfig.exists("formating1D"))
     {
         const std::vector<edm::ParameterSet>& selectEventPSets = iConfig.getParameter<std::vector<edm::ParameterSet>>("formating1D");
-	parseFormating1DConfiguration(selectEventPSets);
+	parseHistoFormating1D(selectEventPSets);
     }
     if (iConfig.exists("formating2D"))
     {
         const std::vector<edm::ParameterSet>& selectEventPSets = iConfig.getParameter<std::vector<edm::ParameterSet>>("formating2D");
-	parseFormating2DConfiguration(selectEventPSets);
+	parseHistoFormating2D(selectEventPSets);
     }
 }
 
@@ -285,6 +289,7 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     const SimTrackContainer simTracks = *(simTracksHandle.product());
 
     std::vector<double>::iterator it;
+    typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
 
     for ( SimTrackContainer::const_iterator  simTrack = simTracks.begin(); simTrack != simTracks.end(); ++simTrack) 
     {
@@ -298,15 +303,20 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 	   {
 	       for( std::vector<PSimHit>::const_iterator Hits=simHits.begin(); Hits!=simHits.end(); ++Hits) 
 	       {
-	           if((*Hits).trackId() == (*simTrack).trackId()) 
+		   int simHitID = (*Hits).trackId();
+		   int simTrackID = (*simTrack).trackId();
+		   int simHitparticleID = (*Hits).particleType();
+		   if(simHitID == simTrackID && passesFilterSelection(Hits))// &&  
 		   {
 		       i_SimHit_Multiplicity++;
 	     
 		       std::set<unsigned int> detIds;
 		       unsigned int detId = (*Hits).detUnitId();
 		       unsigned int isub  = DetId(detId).subdetId();
-		       
-		       
+		       // It works!
+		       //const HepPDT::ParticleData* 
+		       //	 PData = fPDGTable->particle(HepPDT::ParticleID(abs(simHitparticleID))) ;
+		       //double mass   = PData->mass().value() ;
 		       float f_dx = TMath::Power(
 						 TMath::Power( (*Hits).entryPoint().x() - (*Hits).exitPoint().x(), 2) + 
 						 TMath::Power( (*Hits).entryPoint().y() - (*Hits).exitPoint().y(), 2) + 
@@ -325,24 +335,42 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 			   i_SimHit_Pixels_Multiplicity++;
 			   if (pos!=0 && pos<int(bins_test_.size()-1))
 			   {
-			       typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
-			     
 			       for( iter iterator = my_map1.begin(); iterator != my_map1.end(); ++iterator ) 
 			       {
 				   MyClassSetVector foo = iterator->second;
-				   std::cout<<" bug1 "<<iterator->first<<std::endl;    
-				   foo[0][pos-1]->Fill((*Hits).energyLoss()/f_dx);
+				   std::cout<<" bug1 "<<iterator->first<<" xliara "<<pdgIds.size()<<std::endl;   
+				   if (pdgIds.size()!=0)
+				   {
+				       if (std::find(pdgIds.begin(), pdgIds.end(), simHitparticleID) != pdgIds.end())
+				       {
+					   foo[0][pos-1]->Fill((*Hits).energyLoss()/f_dx);
+				       }
+				   }
+				   else
+				   {
+				       foo[0][pos-1]->Fill((*Hits).energyLoss()/f_dx);
+				   }
 				   std::cout <<  " bug1 " << foo[0][pos-1]->getBinContent(1) << std::endl;
 			       }
-			     
+			       
 			   }
-			   typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
-			   for( iter iterator = my_map2.begin(); iterator != my_map2.end(); ++iterator ) {
-			     MyClassSetVector foo = iterator->second;
-			     std::cout<<" bug2 "<<iterator->first<<std::endl;    
-			     foo[0][0]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
-			     std::cout <<  " bug2 " << foo[0][0]->getBinContent(1) << std::endl;
-			   }
+			   for( iter iterator = my_map2.begin(); iterator != my_map2.end(); ++iterator ) 
+			   {
+			       MyClassSetVector foo = iterator->second;
+			       std::cout<<" bug2 "<<iterator->first<<std::endl;    
+			       if (pdgIds.size()!=0)
+			       {
+				   if (std::find(pdgIds.begin(), pdgIds.end(), simHitparticleID) != pdgIds.end())
+				   {
+				       foo[0][0]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
+				   }
+			       }
+			       else
+			       {
+				   foo[0][0]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
+			       }
+			       std::cout <<  " bug2 " << foo[0][0]->getBinContent(1) << std::endl;
+			     }
 			   
 		       }
 		       else if (isub == StripSubdetector::TIB || isub == StripSubdetector::TOB || 
@@ -353,13 +381,21 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 			       if (pos!=0 && pos<int(bins_test_.size()-1))
 			       {
 				   std::cout<<momentumAtEntry<<" meta "<<pos<<" meta "<<bins_test_.size()<<" "<<(*Hits).particleType()<<std::endl;
-				   typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
-			       
 				   for( iter iterator = my_map1.begin(); iterator != my_map1.end(); ++iterator ) 
 				   {
 				       MyClassSetVector foo = iterator->second;
 				       std::cout<<" bug3 "<<iterator->first<<std::endl;    
-				       foo[2][pos-1]->Fill((*Hits).energyLoss()/f_dx);
+				       if (pdgIds.size()!=0)
+				       {
+					   if (std::find(pdgIds.begin(), pdgIds.end(), simHitparticleID) != pdgIds.end())
+					   {
+					       foo[2][pos-1]->Fill((*Hits).energyLoss()/f_dx);
+					   }
+				       }
+				       else
+				       {
+					   foo[2][pos-1]->Fill((*Hits).energyLoss()/f_dx);
+				       }
 				       std::cout <<  " bug3 " << foo[2][pos-1]->getBinContent(1) << std::endl;
 				   }
 			       }
@@ -369,12 +405,21 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 			   {
 			       if (pos!=0 && pos<int(bins_test_.size()-1))
 			       {
-				   typedef std::map<std::string,  std::vector<std::vector<MonitorElement*> > >::iterator iter;
 				   for( iter iterator = my_map1.begin(); iterator != my_map1.end(); ++iterator ) 
 				   {
 				       MyClassSetVector foo = iterator->second;
 				       std::cout<<" bug4 "<<iterator->first<<std::endl;    
-				       foo[1][pos-1]->Fill((*Hits).energyLoss()/f_dx);
+				       if (pdgIds.size()!=0)
+				       {
+					   if (std::find(pdgIds.begin(), pdgIds.end(), simHitparticleID) != pdgIds.end())
+					   {
+					       foo[1][pos-1]->Fill((*Hits).energyLoss()/f_dx);
+					   }
+				       }
+				       else
+				       {
+					     foo[1][pos-1]->Fill((*Hits).energyLoss()/f_dx);
+				       }
 				       std::cout <<  " bug4 " << foo[1][pos-1]->getBinContent(1) << std::endl;
 				   }
 			       }
@@ -416,9 +461,9 @@ DemoAnalyzer::endJob()
 // ------------ method called when starting to processes a run  ------------
 
 void 
-DemoAnalyzer::dqmBeginRun(edm::Run const&, edm::EventSetup const&)
+DemoAnalyzer::dqmBeginRun(edm::Run const& r, edm::EventSetup const& es)
 {
-  
+  es.getData( fPDGTable ) ;
 }
 
 
@@ -457,60 +502,6 @@ DemoAnalyzer::fillDescriptions(edm::ConfigurationDescriptions& descriptions)
     descriptions.addDefault(desc);
 }
 
-/*
-void 
-DemoAnalyzer::bookHistosPerDetector()
-{
-    //EnergyLosses1D
-    int    i_nbins = 200;
-    float  f_range = 1e-2;
-    //EnergyLosses2D-PDG binning
-    int    i_nbins_PDG = 2*2212;
-    float  f_range_PDG = 2213;
-    //EnergyLosses2D-momentum(p) binning
-    int    i_nbins_p = 50;
-    float  f_range_p = 60;
-    //EnergyLosses2D-specific energy loss(dedx) binning
-    int    i_nbins_dedx = 200;    
-    float  f_range_dedx = 1e-2; //1e-3 (eloss)
-    //EnergyLosses2D-thickness(dx) binning
-    int    i_nbins_dx = 200; 
-    float  f_range_dx = 1e-1;
-    
-    //Detectors
-    //Pixel Barrel - 3 different detector
-    bookEnergyLosses1D( histos_PXB_dedx_,  i_nbins, f_range, "PXB", nHistos_PXB_);
-    bookEnergyLossesRelatedInfo2D( histos_PDG_PXB_dedx_, i_nbins_PDG, f_range_PDG, i_nbins_dedx, f_range_dedx,"dEdx", "PDG_PXB", nHistos_PXB_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_PXB_dx_, i_nbins_PDG, f_range_PDG, i_nbins_dx, f_range_dx, "dx", "PDG_PXB", nHistos_PXB_ );
-    bookEnergyLossesRelatedInfo2D( histos_p_PXB_dedx_, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", "p_PXB", nHistos_PXB_ );
-    //Pixel Endcap - 2 different detector
-    bookEnergyLosses1D(histos_PXF_dedx_,  i_nbins, f_range, "PXF", nHistos_PXF_);
-    bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dedx_, i_nbins_PDG, f_range_PDG, i_nbins_dedx, f_range_dedx,"dEdx", "PDG_PXF", nHistos_PXF_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dx_, i_nbins_PDG, f_range_PDG, i_nbins_dx, f_range_dx,"dx", "PDG_PXF", nHistos_PXF_ );
-    bookEnergyLossesRelatedInfo2D( histos_p_PXF_dedx_, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", "p_PXF", nHistos_PXF_ );
-    //TIB - 4 different detectors
-    bookEnergyLosses1D( histos_TIB_dedx_, i_nbins, f_range, "TIB", nHistos_TIB_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_TIB_dedx_, i_nbins_PDG, f_range_PDG, i_nbins_dedx, f_range_dedx,"dEdx", "PDG_TIB", nHistos_TIB_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_TIB_dx_, i_nbins_PDG, f_range_PDG, i_nbins_dx, f_range_dx,"dx", "PDG_TIB", nHistos_TIB_ );
-    bookEnergyLossesRelatedInfo2D( histos_p_TIB_dedx_, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", "p_TIB", nHistos_TIB_ );
-    //TOB - 6 different detectors
-    bookEnergyLosses1D( histos_TOB_dedx_, i_nbins, f_range, "TOB", nHistos_TOB_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_TOB_dedx_, i_nbins_PDG, f_range_PDG, i_nbins_dedx, f_range_dedx, "dEdx", "PDG_TOB", nHistos_TOB_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_TOB_dx_, i_nbins_PDG, f_range_PDG, i_nbins_dx, f_range_dx, "dx", "PDG_TOB", nHistos_TOB_ );
-    bookEnergyLossesRelatedInfo2D( histos_p_TOB_dedx_, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", "p_TOB", nHistos_TOB_ );
-    //TID - 3 different detectors
-    bookEnergyLosses1D( histos_TID_dedx_, i_nbins, f_range, "TID", nHistos_TID_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_TID_dedx_, i_nbins_PDG, f_range_PDG, i_nbins_dedx, f_range_dedx,"dEdx", "PDG_TID", nHistos_TID_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_TID_dx_, i_nbins_PDG, f_range_PDG, i_nbins_dx, f_range_dx,"dx", "PDG_TID", nHistos_TID_ );
-    bookEnergyLossesRelatedInfo2D( histos_p_TID_dedx_, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", "p_TID", nHistos_TID_ );
-    //TEC - 7 different detectors
-    bookEnergyLosses1D( histos_TEC_dedx_, i_nbins, f_range, "TEC", nHistos_TEC_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_TEC_dedx_, i_nbins_PDG, f_range_PDG, i_nbins_dedx, f_range_dedx,"dEdx", "PDG_TEC", nHistos_TEC_ );
-    bookEnergyLossesRelatedInfo2D( histos_PDG_TEC_dx_, i_nbins_PDG, f_range_PDG, i_nbins_dx, f_range_dx,"dx", "PDG_TEC", nHistos_TEC_ );
-    bookEnergyLossesRelatedInfo2D( histos_p_TEC_dedx_, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "dEdx", "p_TEC", nHistos_TEC_ );
-
-}
-*/
 template <typename T> 
 void 
 DemoAnalyzer::bookHistosPerParticle(std::vector<T> & vec,  DQMStore::IBooker & ibooker)
@@ -589,7 +580,7 @@ DemoAnalyzer::bookEnergyLossesRelatedInfo1D( std::vector<MonitorElement*>& histo
         for(unsigned int iHist = 0; iHist < nHistos; iHist++) 
 	{
 	    histos_det_dedx.push_back( ibooker.book1D( Form( "SimHit_%s_%s_%u", var.Data(), det.Data(), iHist+1 ) ,
-						       Form( "(%s,%s);%s;", bins_p[iHist].data(), bins_p[iHist+1].data(), var.Data() ) ,
+						       Form( "(%s,%s);%s;",  bins_p[iHist].data() , bins_p[iHist+1].data(), var.Data() ) ,
 						       nBins , 0. , range ) );
 	}
     }
@@ -619,23 +610,23 @@ void DemoAnalyzer::bookHistograms(DQMStore::IBooker & ibooker, edm::Run const & 
      map_subdet_nlayers_.insert(std::pair<std::string,int>("Pixels",bins_test_.size()-1));
      map_subdet_nlayers_.insert(std::pair<std::string,int>("StripsNoTEC5to7",bins_p.size()-1));
      map_subdet_nlayers_.insert(std::pair<std::string,int>("StripsOnlyTEC5to7",bins_p.size()-1));
-
      
-     std::vector<std::string> pdgIds; // these are the ones we really use
+     std::vector<std::string> pdgNames; // these are the ones we really use
      if (!pdts_.empty()) 
      {
          for (std::vector<PdtEntry>::iterator itp = pdts_.begin(), edp = pdts_.end(); itp != edp; ++itp) 
 	 {
 	     itp->setup(iSetup); // decode string->pdgId and vice-versa
-	     pdgIds.push_back(itp->name());
+	     pdgNames.push_back(itp->name());
+	     pdgIds.push_back(std::abs(itp->pdgId()));
 	 }
      }
      else
      {
-         pdgIds.push_back("all");
+         pdgNames.push_back("all");
      }
 
-     bookHistosPerParticle(pdgIds, ibooker);
+     bookHistosPerParticle(pdgNames, ibooker);
 	  
 }
 
@@ -681,8 +672,23 @@ DemoAnalyzer::removeWhiteSpaces( std::string &strg )
     }
 }
 
+bool
+DemoAnalyzer::passesFilterSelection(std::vector<PSimHit>::const_iterator Hits)
+{
+  float f_dx = TMath::Power(
+			    TMath::Power( (*Hits).entryPoint().x() - (*Hits).exitPoint().x(), 2) + 
+			    TMath::Power( (*Hits).entryPoint().y() - (*Hits).exitPoint().y(), 2) + 
+			    TMath::Power( (*Hits).entryPoint().z() - (*Hits).exitPoint().z(), 2), 
+			    1/2.);
+  
+  if ( (*Hits).energyLoss()/f_dx<0.0028 )
+    return false;
+  else
+    return true;
+}
+
 void
-DemoAnalyzer::parseFormating1DConfiguration(const std::vector<edm::ParameterSet>& selectEventPSets)
+DemoAnalyzer::parseHistoFormating1D(const std::vector<edm::ParameterSet>& selectEventPSets)
 {
     for (unsigned int iname=0; iname< selectEventPSets.size(); ++iname)
     {
@@ -691,11 +697,12 @@ DemoAnalyzer::parseFormating1DConfiguration(const std::vector<edm::ParameterSet>
 	selectedProcessPaths_.labelx=selectEventPSets[iname].getUntrackedParameter<std::string>("labelx");
 	selectedProcessPaths_.labely=selectEventPSets[iname].getUntrackedParameter<std::string>("labely");
 	selectedProcessPaths_.rangex=selectEventPSets[iname].getUntrackedParameter<std::vector<double> >("rangex");
+	std::cout<< " bins !!!!!!!! "<<selectedProcessPaths_.rangex[1]<<std::endl;
     }
 }
 
 void
-DemoAnalyzer::parseFormating2DConfiguration(const std::vector<edm::ParameterSet>& selectEventPSets)
+DemoAnalyzer::parseHistoFormating2D(const std::vector<edm::ParameterSet>& selectEventPSets)
 {
     for (unsigned int iname=0; iname< selectEventPSets.size(); ++iname)
     {
