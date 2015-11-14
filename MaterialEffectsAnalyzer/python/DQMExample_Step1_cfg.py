@@ -21,7 +21,7 @@ process.load("Analyzer.MaterialEffectsAnalyzer.DQMExample_Step1_cfi")
 
 
 process.maxEvents = cms.untracked.PSet(
-    input = cms.untracked.int32(100)
+    input = cms.untracked.int32(500)
 )
 
 f = open('ppions_FULLSIM_GENSIM_05_10.txt', 'r')

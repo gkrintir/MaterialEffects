@@ -16,11 +16,10 @@ DQMExample_Step1 = cms.EDAnalyzer('DemoAnalyzer',
         #cms.InputTag("g4SimHits", "TrackerHitsTIDHighTof"),
         #cms.InputTag("g4SimHits", "TrackerHitsTOBLowTof"), 
         #cms.InputTag("g4SimHits", "TrackerHitsTOBHighTof")
-        ),
+     ),
      particles = cms.untracked.string('pions/'), #token(e.g. :) could be everything other a number, a letter and an underscore
      #particleTypes = cms.untracked.vint32(2212),
-     bins_p = cms.untracked.vstring('2.1','1.2', '3.4', '.8', '5.2', '.4'),
-     DaughterIDs =  cms.untracked.vdouble(2.1, 1.2, 3.4, .8, 5.2, .4),
+     #bins_p =  cms.untracked.vdouble(2.1, 1.2, 3.4, .8, 5.2, .4),
      TestParticleFilter = cms.PSet(
         # Particles with |eta| > etaMax (momentum direction at primary vertex)
         # are not simulated 

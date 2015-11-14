@@ -90,15 +90,15 @@ class DemoAnalyzer : public DQMEDAnalyzer {
 	  std::vector<double> rangex;
       };
   
-    struct formating2D
-    {
-        std::string title;
-        std::string name;
-        std::string labelx;
-        std::string labely;
-        std::vector<double> rangex;
-        std::vector<double> rangey;
-    };
+      struct formating2D
+      {
+          std::string title;
+          std::string name;
+          std::string labelx;
+          std::string labely;
+          std::vector<double> rangex;
+          std::vector<double> rangey;
+      };
 
 
    private:
@@ -109,7 +109,7 @@ class DemoAnalyzer : public DQMEDAnalyzer {
   
       // ----------member data ---------------------------
       template <typename T> 
-      void bookHistosPerParticle(std::vector<T> & vec,  DQMStore::IBooker & ibooker);
+      void bookHistosPerParticle(std::vector<T> & pdg, DQMStore::IBooker & ibooker);
 
   
       void bookEnergyLossesRelatedInfo2D( std::vector<MonitorElement*>&, DQMStore::IBooker & ibooker,
@@ -118,20 +118,20 @@ class DemoAnalyzer : public DQMEDAnalyzer {
 
       void bookEnergyLossesRelatedInfo1D( std::vector<MonitorElement*>&, DQMStore::IBooker & ibooker, int nBins, float range, 
 					  const TString &var, const TString &det, unsigned int nHistos );
-      
+
+      void initConfiguration();
       bool passesFilterSelection(std::vector<PSimHit>::const_iterator Hits);
+      void parseConfiguration(const edm::ParameterSet& iConfig);
       void parseHistoFormating1D(const std::vector<edm::ParameterSet>& selectEventPSets);
       void parseHistoFormating2D(const std::vector<edm::ParameterSet>& selectEventPSets);
    
       std::vector<edm::InputTag> simHitsTag_;
       std::string particles_;
-      std::vector<std::string> bins_E;
-      std::vector<std::string> bins_p;
-    
       std::vector<double> bins_test_;
-      std::vector<float> bins1_;
+
+  //std::vector<float> bins1_;
       std::vector<PdtEntry> pdts_;   // these are needed before we get the EventSetup
-      std::vector<int> pdgIds;
+      std::vector<int> pdgIdsToSelect_;
       edm::ESHandle<HepPDT::ParticleDataTable> fPDGTable ;
 
       //Helper Functions
@@ -143,13 +143,12 @@ class DemoAnalyzer : public DQMEDAnalyzer {
       MyClassSetMap my_map1;
       MyClassSetMap my_map2;
   
-      typedef StringCutObjectSelector<reco::GenParticle> StrFilter;
-      std::auto_ptr<StrFilter> filter_;
-
       edm::ParameterSet particleFilter_;
       double etaMax_;
       double pTMin_;
       double EMin_;
+      std::vector<int> pdgIdsToFilter_;
+
       formating1D selectedProcessPaths_;
       formating2D selectedProcessPaths2_;
       // Detectors
@@ -158,7 +157,12 @@ class DemoAnalyzer : public DQMEDAnalyzer {
      
       // PSimHits
       std::vector<edm::InputTag> trackerContainers_;
-    
+
+      edm::Service<TFileService> fs_;
+      TH1F* h_Track_Eta_;
+      TH1F* h_SimHit_Eta_;
+      TH1F* h_SimHit_Eta_CM;
+  
 };
 
 //
@@ -175,75 +179,15 @@ class DemoAnalyzer : public DQMEDAnalyzer {
 DemoAnalyzer::DemoAnalyzer(const edm::ParameterSet& iConfig):
 
   simHitsTag_(iConfig.getParameter<std::vector<edm::InputTag> >("SimHitTagLabels")),
-  particles_(),
-  bins_E(),
-  bins_p(),
-  selectedProcessPaths_()
-  //bins_test(iConfig.getUntrackedParameter<std::vector<double> >("NbEventsToPrint",0.))
-  //bins_test(2,static_cast<float>(0.))
-
-  //fs_()
-
-
+  fs_()
+  
 {
-      for (unsigned int i_subDet=0; i_subDet<simHitsTag_.size(); ++i_subDet)
-      {
-          trackerContainers_.push_back(simHitsTag_[i_subDet]);
-      }
+    initConfiguration();
+    parseConfiguration(iConfig);
+    h_Track_Eta_ = fs_->make<TH1F>("SimTrack_Eta", ";#eta", 200, -2.5, 2.5); //ok
+    h_SimHit_Eta_ = fs_->make<TH1F>("SimHit_Eta", ";#eta", 200, -2.5, 2.5); //ok
+    h_SimHit_Eta_CM = fs_->make<TH1F>("SimHit_Eta_CM", ";#eta", 200, -2.5, 2.5); //ok
 
-
-    // Possibly allow a list of particle types
-    if (iConfig.exists("particleTypes")) 
-    {
-        pdts_ = iConfig.getUntrackedParameter<std::vector<PdtEntry> >("particleTypes");
-    }
-    // Possibly allow a string cut
-    if (iConfig.existsAs<std::string>("filter")) 
-    {
-        std::string filter = iConfig.getParameter<std::string>("filter");
-        if (!filter.empty())
-	{
- 	    filter_ = std::auto_ptr<StrFilter>(new StrFilter(filter));
-        }
-    }
-
-    particles_ = iConfig.getUntrackedParameter <std::string > ("particles");
-    bins_E = iConfig.getUntrackedParameter <std::vector <std::string> > ("bins_E", std::vector<std::string>());
-    bins_p = iConfig.getUntrackedParameter <std::vector <std::string> > ("bins_p", std::vector<std::string>());
-
-    bins_test_ = iConfig.getUntrackedParameter< std::vector<double> >("DaughterIDs");
-    std::cout << " !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! " << bins_test_[0]<< std::endl;
-    sort(bins_test_.begin(),bins_test_.end());
-    
-    //if (!bins_p.empty()) 
-    if (iConfig.exists("bins_p")) {
-      sort(bins_p.begin(),bins_p.end());	
-	
-      for (unsigned int it=0; it!=bins_p.size(); ++it)
-	bins1_.push_back(std::atof(bins_p[it].data()));
-	//std::cout << " !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! " << bins_[it]<< std::endl;
-      sort(bins1_.begin(),bins1_.end());	
-    }
-    
-    if (iConfig.exists("TestParticleFilter"))
-    {
-    	particleFilter_ = iConfig.getParameter<edm::ParameterSet>("TestParticleFilter");
-        etaMax_ = particleFilter_.getParameter<double>("etaMax");
-	pTMin_ = particleFilter_.getParameter<double>("pTMin");
-	EMin_ = particleFilter_.getParameter<double>("EMin");
-	std::cout<<" eta!!!! "<<EMin_<<std::endl;
-    }
-
-    if (iConfig.exists("formating1D"))
-    {
-        const std::vector<edm::ParameterSet>& selectEventPSets = iConfig.getParameter<std::vector<edm::ParameterSet>>("formating1D");
-	parseHistoFormating1D(selectEventPSets);
-    }
-    if (iConfig.exists("formating2D"))
-    {
-        const std::vector<edm::ParameterSet>& selectEventPSets = iConfig.getParameter<std::vector<edm::ParameterSet>>("formating2D");
-	parseHistoFormating2D(selectEventPSets);
-    }
 }
 
 DemoAnalyzer::~DemoAnalyzer()
@@ -283,6 +227,10 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     iSetup.get<IdealGeometryRecord>().get(tTopoHandle);
     const TrackerTopology* const tTopo = tTopoHandle.product();
 
+    ESHandle< TrackerGeometry > TG;
+    iSetup.get<TrackerDigiGeometryRecord>().get(TG);
+    const TrackerGeometry *theTrackerGeometry = TG.product ();
+
     //Retrieve the Monte Carlo truth Particles(SimTracks)
     Handle< SimTrackContainer > simTracksHandle;
     iEvent.getByLabel(trackerContainers_[0].label(),simTracksHandle); 
@@ -313,6 +261,11 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 		       std::set<unsigned int> detIds;
 		       unsigned int detId = (*Hits).detUnitId();
 		       unsigned int isub  = DetId(detId).subdetId();
+		       const GeomDet* theGeomDet = theTrackerGeometry->idToDet((*Hits).detUnitId());
+		       std::cout<< theGeomDet->toGlobal((*Hits).momentumAtEntry()).z()<<std::endl;
+		       h_Track_Eta_->Fill((*simTrack).momentum().Eta());
+		       h_SimHit_Eta_->Fill( 1/2.*std::log((theGeomDet->toGlobal((*Hits).momentumAtEntry()).mag()+theGeomDet->toGlobal((*Hits).momentumAtEntry()).z())/ (theGeomDet->toGlobal((*Hits).momentumAtEntry()).mag()-theGeomDet->toGlobal((*Hits).momentumAtEntry()).z())) ); 
+		       h_SimHit_Eta_CM->Fill( 1/2.*std::log(((*Hits).momentumAtEntry().mag()+(*Hits).momentumAtEntry().z())/ ((*Hits).momentumAtEntry().mag()-(*Hits).momentumAtEntry().z())));
 		       // It works!
 		       //const HepPDT::ParticleData* 
 		       //	 PData = fPDGTable->particle(HepPDT::ParticleID(abs(simHitparticleID))) ;
@@ -338,10 +291,10 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 			       for( iter iterator = my_map1.begin(); iterator != my_map1.end(); ++iterator ) 
 			       {
 				   MyClassSetVector foo = iterator->second;
-				   std::cout<<" bug1 "<<iterator->first<<" xliara "<<pdgIds.size()<<std::endl;   
-				   if (pdgIds.size()!=0)
+				   std::cout<<" bug1 "<<iterator->first<<" xliara "<<pdgIdsToSelect_.size()<<std::endl;   
+				   if (pdgIdsToSelect_.size()!=0)
 				   {
-				       if (std::find(pdgIds.begin(), pdgIds.end(), simHitparticleID) != pdgIds.end())
+				       if (std::find(pdgIdsToSelect_.begin(), pdgIdsToSelect_.end(), simHitparticleID) != pdgIdsToSelect_.end())
 				       {
 					   foo[0][pos-1]->Fill((*Hits).energyLoss()/f_dx);
 				       }
@@ -358,9 +311,9 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 			   {
 			       MyClassSetVector foo = iterator->second;
 			       std::cout<<" bug2 "<<iterator->first<<std::endl;    
-			       if (pdgIds.size()!=0)
+			       if (pdgIdsToSelect_.size()!=0)
 			       {
-				   if (std::find(pdgIds.begin(), pdgIds.end(), simHitparticleID) != pdgIds.end())
+				   if (std::find(pdgIdsToSelect_.begin(), pdgIdsToSelect_.end(), simHitparticleID) != pdgIdsToSelect_.end())
 				   {
 				       foo[0][0]->Fill((*Hits).pabs(), (*Hits).energyLoss()/f_dx);
 				   }
@@ -385,9 +338,9 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 				   {
 				       MyClassSetVector foo = iterator->second;
 				       std::cout<<" bug3 "<<iterator->first<<std::endl;    
-				       if (pdgIds.size()!=0)
+				       if (pdgIdsToSelect_.size()!=0)
 				       {
-					   if (std::find(pdgIds.begin(), pdgIds.end(), simHitparticleID) != pdgIds.end())
+					   if (std::find(pdgIdsToSelect_.begin(), pdgIdsToSelect_.end(), simHitparticleID) != pdgIdsToSelect_.end())
 					   {
 					       foo[2][pos-1]->Fill((*Hits).energyLoss()/f_dx);
 					   }
@@ -409,9 +362,9 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 				   {
 				       MyClassSetVector foo = iterator->second;
 				       std::cout<<" bug4 "<<iterator->first<<std::endl;    
-				       if (pdgIds.size()!=0)
+				       if (pdgIdsToSelect_.size()!=0)
 				       {
-					   if (std::find(pdgIds.begin(), pdgIds.end(), simHitparticleID) != pdgIds.end())
+					   if (std::find(pdgIdsToSelect_.begin(), pdgIdsToSelect_.end(), simHitparticleID) != pdgIdsToSelect_.end())
 					   {
 					       foo[1][pos-1]->Fill((*Hits).energyLoss()/f_dx);
 					   }
@@ -504,7 +457,7 @@ DemoAnalyzer::fillDescriptions(edm::ConfigurationDescriptions& descriptions)
 
 template <typename T> 
 void 
-DemoAnalyzer::bookHistosPerParticle(std::vector<T> & vec,  DQMStore::IBooker & ibooker)
+DemoAnalyzer::bookHistosPerParticle(std::vector<T> & pdg, DQMStore::IBooker & ibooker)
 {
 
 
@@ -546,8 +499,8 @@ DemoAnalyzer::bookHistosPerParticle(std::vector<T> & vec,  DQMStore::IBooker & i
     MyClassSetVector histos_particles_p_dedx;
     //MyClassSetMap my_map;
     
-
-    for (unsigned int i=0; i<vec.size(); ++i) 
+    
+    for (unsigned int i=0; i<pdg.size(); ++i) 
       {
         for ( auto& x: map_subdet_nlayers_)//=map_subdet_nlayers_.begin(); it!=map_subdet_nlayers_.end(); ++it)
 	{
@@ -559,10 +512,10 @@ DemoAnalyzer::bookHistosPerParticle(std::vector<T> & vec,  DQMStore::IBooker & i
 	    str_subdet.append(x.first);
 	    std::cout << " !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! " << selectedProcessPaths_.name.data()<< std::endl;
 
-	    bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dedx, ibooker, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "p", "dEdx", Form("%s_%s", str_subdet.data(), vec[i].data()));
-	    bookEnergyLossesRelatedInfo1D( histos_PXB_dedx, ibooker, i_nbins_dedx, f_range_dedx, "dEdx", Form("%s_%s", str_subdet.data(), vec[i].data()), x.second );
-	    my_map1[vec[i]].push_back(histos_PXB_dedx);
-	    my_map2[vec[i]].push_back(histos_PDG_PXF_dedx);
+	    bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dedx, ibooker, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "p", "dEdx", Form("%s_%s", str_subdet.data(), pdg[i].data()));
+	    bookEnergyLossesRelatedInfo1D( histos_PXB_dedx, ibooker, i_nbins_dedx, f_range_dedx, "dEdx", Form("%s_%s", str_subdet.data(), pdg[i].data()), x.second );
+	    my_map1[pdg[i]].push_back(histos_PXB_dedx);
+	    my_map2[pdg[i]].push_back(histos_PDG_PXF_dedx);
 	}
     }
     std::cout<<my_map1.size()<<std::endl;
@@ -574,13 +527,13 @@ void
 DemoAnalyzer::bookEnergyLossesRelatedInfo1D( std::vector<MonitorElement*>& histos_det_dedx, DQMStore::IBooker & ibooker, int nBins, float range, 
 					     const TString &var, const TString &det, unsigned int nHistos )
 {
-    if (!bins_p.empty()) 
+    if (!bins_test_.empty()) 
     {
 
         for(unsigned int iHist = 0; iHist < nHistos; iHist++) 
 	{
 	    histos_det_dedx.push_back( ibooker.book1D( Form( "SimHit_%s_%s_%u", var.Data(), det.Data(), iHist+1 ) ,
-						       Form( "(%s,%s);%s;",  bins_p[iHist].data() , bins_p[iHist+1].data(), var.Data() ) ,
+						       Form( "(%.2f,%.2f);%s;",  bins_test_[iHist] , bins_test_[iHist+1], var.Data() ) ,
 						       nBins , 0. , range ) );
 	}
     }
@@ -608,9 +561,10 @@ void DemoAnalyzer::bookHistograms(DQMStore::IBooker & ibooker, edm::Run const & 
      ibooker.setCurrentFolder("testMaterialEffects");
      
      map_subdet_nlayers_.insert(std::pair<std::string,int>("Pixels",bins_test_.size()-1));
-     map_subdet_nlayers_.insert(std::pair<std::string,int>("StripsNoTEC5to7",bins_p.size()-1));
-     map_subdet_nlayers_.insert(std::pair<std::string,int>("StripsOnlyTEC5to7",bins_p.size()-1));
+     map_subdet_nlayers_.insert(std::pair<std::string,int>("StripsNoTEC5to7",bins_test_.size()-1));
+     map_subdet_nlayers_.insert(std::pair<std::string,int>("StripsOnlyTEC5to7",bins_test_.size()-1));
      
+
      std::vector<std::string> pdgNames; // these are the ones we really use
      if (!pdts_.empty()) 
      {
@@ -618,7 +572,7 @@ void DemoAnalyzer::bookHistograms(DQMStore::IBooker & ibooker, edm::Run const & 
 	 {
 	     itp->setup(iSetup); // decode string->pdgId and vice-versa
 	     pdgNames.push_back(itp->name());
-	     pdgIds.push_back(std::abs(itp->pdgId()));
+	     pdgIdsToSelect_.push_back(std::abs(itp->pdgId()));
 	 }
      }
      else
@@ -629,6 +583,40 @@ void DemoAnalyzer::bookHistograms(DQMStore::IBooker & ibooker, edm::Run const & 
      bookHistosPerParticle(pdgNames, ibooker);
 	  
 }
+
+
+void
+DemoAnalyzer::initConfiguration()
+{
+
+    bins_test_.push_back(.4);
+    bins_test_.push_back(.8);
+    bins_test_.push_back(1.2);
+    bins_test_.push_back(2.1);
+    bins_test_.push_back(3.4);
+    bins_test_.push_back(5.5);
+    
+    etaMax_ = 2.5;
+    pTMin_ = 0.05;
+    EMin_ = 0;
+
+    selectedProcessPaths_.labelx = "dEdx";
+    selectedProcessPaths_.labely = "";
+    selectedProcessPaths_.rangex.push_back(200); //nBins
+    selectedProcessPaths_.rangex.push_back(0.); //xMin
+    selectedProcessPaths_.rangex.push_back(0.01); //xMax
+
+    selectedProcessPaths2_.labelx = "p";
+    selectedProcessPaths2_.labely = "dEdx";
+    selectedProcessPaths2_.rangex.push_back(50); //nBins
+    selectedProcessPaths2_.rangex.push_back(0.); //xMin
+    selectedProcessPaths2_.rangex.push_back(60); //xMax
+    selectedProcessPaths2_.rangey.push_back(200); //nBins
+    selectedProcessPaths2_.rangey.push_back(0.); //xMin
+    selectedProcessPaths2_.rangey.push_back(0.01); //xMax
+    
+}
+
 
 void 
 DemoAnalyzer::identifyToken (std::set<char> & token, const std::string& tokenize ) 
@@ -675,16 +663,70 @@ DemoAnalyzer::removeWhiteSpaces( std::string &strg )
 bool
 DemoAnalyzer::passesFilterSelection(std::vector<PSimHit>::const_iterator Hits)
 {
-  float f_dx = TMath::Power(
-			    TMath::Power( (*Hits).entryPoint().x() - (*Hits).exitPoint().x(), 2) + 
-			    TMath::Power( (*Hits).entryPoint().y() - (*Hits).exitPoint().y(), 2) + 
-			    TMath::Power( (*Hits).entryPoint().z() - (*Hits).exitPoint().z(), 2), 
-			    1/2.);
-  
-  if ( (*Hits).energyLoss()/f_dx<0.0028 )
-    return false;
-  else
-    return true;
+    float f_dx = TMath::Power(
+			      TMath::Power( (*Hits).entryPoint().x() - (*Hits).exitPoint().x(), 2) + 
+			      TMath::Power( (*Hits).entryPoint().y() - (*Hits).exitPoint().y(), 2) + 
+			      TMath::Power( (*Hits).entryPoint().z() - (*Hits).exitPoint().z(), 2), 
+			      1/2.);
+    
+    if ( (*Hits).energyLoss()/f_dx<0.0028 )
+      return false;
+    else
+      return true;
+}
+
+void
+DemoAnalyzer::parseConfiguration(const edm::ParameterSet& iConfig)
+{
+
+    for (unsigned int i_subDet=0; i_subDet<simHitsTag_.size(); ++i_subDet)
+    {
+	trackerContainers_.push_back(simHitsTag_[i_subDet]);
+    }
+
+    // Possibly allow a list of particle types
+    if (iConfig.exists("particleTypes")) 
+    {
+        pdts_ = iConfig.getUntrackedParameter<std::vector<PdtEntry> >("particleTypes");
+    }
+    
+    particles_ = iConfig.getUntrackedParameter <std::string > ("particles");
+    if (iConfig.exists("bins_E") && iConfig.exists("bins_p"))
+    {	
+	edm::LogWarning("TooManyBins") << "default momentum bins will be used";
+    }
+    else if (iConfig.exists("bins_p"))
+    {
+	bins_test_ = iConfig.getUntrackedParameter <std::vector <double> >("bins_p");
+    }
+    else if (iConfig.exists("bins_E"))
+    {
+        bins_test_ = iConfig.getUntrackedParameter <std::vector <double> >("bins_E");
+    }
+
+
+    sort(bins_test_.begin(),bins_test_.end());
+    
+    if (iConfig.exists("TestParticleFilter"))
+    {
+    	particleFilter_ = iConfig.getParameter<edm::ParameterSet>("TestParticleFilter");
+        etaMax_ = particleFilter_.getParameter<double>("etaMax");
+	pTMin_ = particleFilter_.getParameter<double>("pTMin");
+	EMin_ = particleFilter_.getParameter<double>("EMin");
+	pdgIdsToFilter_ = particleFilter_.getParameter<std::vector<int> >("IDs");
+    }
+
+    if (iConfig.exists("formating1D"))
+    {
+        const std::vector<edm::ParameterSet>& selectEventPSets = iConfig.getParameter<std::vector<edm::ParameterSet>>("formating1D");
+	parseHistoFormating1D(selectEventPSets);
+    }
+    if (iConfig.exists("formating2D"))
+    {
+        const std::vector<edm::ParameterSet>& selectEventPSets = iConfig.getParameter<std::vector<edm::ParameterSet>>("formating2D");
+	parseHistoFormating2D(selectEventPSets);
+    }
+
 }
 
 void
@@ -697,7 +739,6 @@ DemoAnalyzer::parseHistoFormating1D(const std::vector<edm::ParameterSet>& select
 	selectedProcessPaths_.labelx=selectEventPSets[iname].getUntrackedParameter<std::string>("labelx");
 	selectedProcessPaths_.labely=selectEventPSets[iname].getUntrackedParameter<std::string>("labely");
 	selectedProcessPaths_.rangex=selectEventPSets[iname].getUntrackedParameter<std::vector<double> >("rangex");
-	std::cout<< " bins !!!!!!!! "<<selectedProcessPaths_.rangex[1]<<std::endl;
     }
 }
 
