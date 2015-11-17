@@ -59,6 +59,7 @@
 #include "TH2.h"
 #include "TMath.h"
 #include "TString.h"
+#include <algorithm>
 #include <list>
 #include <map>
 #include <vector>
@@ -87,7 +88,7 @@ class DemoAnalyzer : public DQMEDAnalyzer {
 	  std::string name;
 	  std::string labelx;
 	  std::string labely;
-	  std::vector<double> rangex;
+	  std::vector<double>  rangex;
       };
   
       struct formating2D
@@ -120,16 +121,17 @@ class DemoAnalyzer : public DQMEDAnalyzer {
 					  const TString &var, const TString &det, unsigned int nHistos );
 
       void initConfiguration();
-      bool passesFilterSelection(std::vector<PSimHit>::const_iterator Hits);
+      bool passesFilterSelection(edm::SimTrackContainer::const_iterator simTrack);
       void parseConfiguration(const edm::ParameterSet& iConfig);
       void parseHistoFormating1D(const std::vector<edm::ParameterSet>& selectEventPSets);
       void parseHistoFormating2D(const std::vector<edm::ParameterSet>& selectEventPSets);
-   
+      void publishParticleFilterWarnings();
+      void publishHistoFormating1DWarnings(const std::vector<edm::ParameterSet>& selectEventPSets);
+      void publishHistoFormating2DWarnings(const std::vector<edm::ParameterSet>& selectEventPSets);
+  
       std::vector<edm::InputTag> simHitsTag_;
-      std::string particles_;
       std::vector<double> bins_test_;
 
-  //std::vector<float> bins1_;
       std::vector<PdtEntry> pdts_;   // these are needed before we get the EventSetup
       std::vector<int> pdgIdsToSelect_;
       edm::ESHandle<HepPDT::ParticleDataTable> fPDGTable ;
@@ -144,13 +146,19 @@ class DemoAnalyzer : public DQMEDAnalyzer {
       MyClassSetMap my_map2;
   
       edm::ParameterSet particleFilter_;
+      double etaMin_;
       double etaMax_;
       double pTMin_;
+      double pTMax_;
+      double pMin_;
+      double pMax_;
       double EMin_;
+      double EMax_;
+
       std::vector<int> pdgIdsToFilter_;
 
-      formating1D selectedProcessPaths_;
-      formating2D selectedProcessPaths2_;
+      std::vector<formating1D> selectedProcessPaths_;
+      std::vector<formating2D> selectedProcessPaths2_;
       // Detectors
       std::map<std::string, int> map_subdet_nlayers_;
 
@@ -178,11 +186,11 @@ class DemoAnalyzer : public DQMEDAnalyzer {
 //
 DemoAnalyzer::DemoAnalyzer(const edm::ParameterSet& iConfig):
 
-  simHitsTag_(iConfig.getParameter<std::vector<edm::InputTag> >("SimHitTagLabels")),
+  simHitsTag_(iConfig.getParameter<std::vector<edm::InputTag> >("SimHitTags")),
   fs_()
   
 {
-    initConfiguration();
+  //initConfiguration();
     parseConfiguration(iConfig);
     h_Track_Eta_ = fs_->make<TH1F>("SimTrack_Eta", ";#eta", 200, -2.5, 2.5); //ok
     h_SimHit_Eta_ = fs_->make<TH1F>("SimHit_Eta", ";#eta", 200, -2.5, 2.5); //ok
@@ -254,7 +262,7 @@ DemoAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 		   int simHitID = (*Hits).trackId();
 		   int simTrackID = (*simTrack).trackId();
 		   int simHitparticleID = (*Hits).particleType();
-		   if(simHitID == simTrackID && passesFilterSelection(Hits))// &&  
+		   if(simHitID == simTrackID && passesFilterSelection(simTrack))// &&  
 		   {
 		       i_SimHit_Multiplicity++;
 	     
@@ -417,6 +425,7 @@ void
 DemoAnalyzer::dqmBeginRun(edm::Run const& r, edm::EventSetup const& es)
 {
   es.getData( fPDGTable ) ;
+  
 }
 
 
@@ -467,42 +476,14 @@ DemoAnalyzer::bookHistosPerParticle(std::vector<T> & pdg, DQMStore::IBooker & ib
     //EnergyLosses2D-specific energy loss(dedx) binning
     int    i_nbins_dedx = 200;    
     float  f_range_dedx = 1e-2; //1e-3 (eloss)
-
-    /*    
-    //EnergyLosses2D-PDG binning
-    int    i_nbins_PDG = 2*2212;
-    float  f_range_PDG = 2213;
-    //EnergyLosses2D-momentum(p) binning
-    int    i_nbins_p = 50;
-    float  f_range_p = 60;
-    //EnergyLosses2D-specific energy loss(dedx) binning
-    int    i_nbins_dedx = 200;    
-    float  f_range_dedx = 1e-2; //1e-3 (eloss)
-    //EnergyLosses2D-thickness(dx) binning
-    int    i_nbins_dx = 200; 
-    float  f_range_dx = 1e-1;
-    */
-    //
-    /*
-    std::vector<std::string> vctr_particles;
-    std::set<char> token;
-    identifyToken(token, str_particles);
-    std::istringstream particles_toDraw(str_particles);
-    std::string s_particle;
-    while (std::getline(particles_toDraw, s_particle, (*token.begin()))) {
-      removeWhiteSpaces(s_particle);
-      vctr_particles.push_back(s_particle);
-    }
-    */
-    //    std::cout<<vctr_particles.size()<<std::endl;
-    //
+  
     MyClassSetVector histos_particles_p_dedx;
     //MyClassSetMap my_map;
     
     
     for (unsigned int i=0; i<pdg.size(); ++i) 
       {
-        for ( auto& x: map_subdet_nlayers_)//=map_subdet_nlayers_.begin(); it!=map_subdet_nlayers_.end(); ++it)
+        for ( auto& x: map_subdet_nlayers_)
 	{
 	    
 	    std::vector<MonitorElement*> histos_PXB_dedx;
@@ -510,8 +491,7 @@ DemoAnalyzer::bookHistosPerParticle(std::vector<T> & pdg, DQMStore::IBooker & ib
 
 	    std::string str_subdet; 
 	    str_subdet.append(x.first);
-	    std::cout << " !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! " << selectedProcessPaths_.name.data()<< std::endl;
-
+	    
 	    bookEnergyLossesRelatedInfo2D( histos_PDG_PXF_dedx, ibooker, i_nbins_p, f_range_p, i_nbins_dedx, f_range_dedx, "p", "dEdx", Form("%s_%s", str_subdet.data(), pdg[i].data()));
 	    bookEnergyLossesRelatedInfo1D( histos_PXB_dedx, ibooker, i_nbins_dedx, f_range_dedx, "dEdx", Form("%s_%s", str_subdet.data(), pdg[i].data()), x.second );
 	    my_map1[pdg[i]].push_back(histos_PXB_dedx);
@@ -527,16 +507,26 @@ void
 DemoAnalyzer::bookEnergyLossesRelatedInfo1D( std::vector<MonitorElement*>& histos_det_dedx, DQMStore::IBooker & ibooker, int nBins, float range, 
 					     const TString &var, const TString &det, unsigned int nHistos )
 {
-    if (!bins_test_.empty()) 
-    {
-
-        for(unsigned int iHist = 0; iHist < nHistos; iHist++) 
-	{
-	    histos_det_dedx.push_back( ibooker.book1D( Form( "SimHit_%s_%s_%u", var.Data(), det.Data(), iHist+1 ) ,
-						       Form( "(%.2f,%.2f);%s;",  bins_test_[iHist] , bins_test_[iHist+1], var.Data() ) ,
-						       nBins , 0. , range ) );
+  std::cout<< " megethos !! "<< selectedProcessPaths_.size()<< " "<<nHistos<<std::endl;
+  for(unsigned int iHist = 0; iHist < nHistos; iHist++) 
+  {   
+      if (selectedProcessPaths_.size()==nHistos)
+      {
+	  if (selectedProcessPaths_[iHist].title.compare("default") && selectedProcessPaths_[iHist].name.compare("default")) 
+	  {
+	    std::string labelx(selectedProcessPaths_[iHist].labelx.data());
+	    std::string labely(selectedProcessPaths_[iHist].labely.data());
+	    int nBins = selectedProcessPaths_[iHist].rangex[0];
+	    double lowBinX = selectedProcessPaths_[iHist].rangex[1];
+	    double highBinX = selectedProcessPaths_[iHist].rangex[2];
+	  histos_det_dedx.push_back( ibooker.book1D( Form( "SimHit_%s_%s_%u", var.Data(), det.Data(), iHist+1 ) ,
+						     Form( "(%.2f,%.2f);%s;%s", bins_test_[iHist] , bins_test_[iHist+1], labelx.data(),labely.data() ) , 
+						     nBins , lowBinX, highBinX ) );
 	}
-    }
+      }
+      
+      
+  }
 }
 
 
@@ -579,7 +569,9 @@ void DemoAnalyzer::bookHistograms(DQMStore::IBooker & ibooker, edm::Run const & 
      {
          pdgNames.push_back("all");
      }
-
+     
+     sort(pdgIdsToSelect_.begin(),pdgIdsToSelect_.end());
+     publishParticleFilterWarnings();
      bookHistosPerParticle(pdgNames, ibooker);
 	  
 }
@@ -596,10 +588,13 @@ DemoAnalyzer::initConfiguration()
     bins_test_.push_back(3.4);
     bins_test_.push_back(5.5);
     
+    
     etaMax_ = 2.5;
     pTMin_ = 0.05;
+    pMin_ = 0.05;
     EMin_ = 0;
 
+    /*
     selectedProcessPaths_.labelx = "dEdx";
     selectedProcessPaths_.labely = "";
     selectedProcessPaths_.rangex.push_back(200); //nBins
@@ -614,7 +609,7 @@ DemoAnalyzer::initConfiguration()
     selectedProcessPaths2_.rangey.push_back(200); //nBins
     selectedProcessPaths2_.rangey.push_back(0.); //xMin
     selectedProcessPaths2_.rangey.push_back(0.01); //xMax
-    
+    */
 }
 
 
@@ -661,18 +656,40 @@ DemoAnalyzer::removeWhiteSpaces( std::string &strg )
 }
 
 bool
-DemoAnalyzer::passesFilterSelection(std::vector<PSimHit>::const_iterator Hits)
+DemoAnalyzer::passesFilterSelection(edm::SimTrackContainer::const_iterator simTrack)
 {
-    float f_dx = TMath::Power(
-			      TMath::Power( (*Hits).entryPoint().x() - (*Hits).exitPoint().x(), 2) + 
-			      TMath::Power( (*Hits).entryPoint().y() - (*Hits).exitPoint().y(), 2) + 
-			      TMath::Power( (*Hits).entryPoint().z() - (*Hits).exitPoint().z(), 2), 
-			      1/2.);
-    
-    if ( (*Hits).energyLoss()/f_dx<0.0028 )
-      return false;
-    else
-      return true;
+
+   if ((*simTrack).momentum().Eta() < etaMin_)
+   {
+       return false;
+   }
+   if ((*simTrack).momentum().Eta() > etaMax_)
+   {
+       return false;
+   }
+   if ((*simTrack).momentum().Pt() < pTMin_)
+   {
+       return false;
+   }
+   if ((*simTrack).momentum().Pt() > pTMax_)
+   {
+       return false;
+   }
+   if ((*simTrack).momentum().P() < pMin_)
+   {
+       return false;
+   }
+   if ((*simTrack).momentum().E() < EMin_)
+   {
+       return false;
+   }
+   if (std::find(pdgIdsToFilter_.begin(), pdgIdsToFilter_.end(), fabs((*simTrack).type())) != pdgIdsToFilter_.end())
+   {
+       return false;
+   }
+     
+   
+   return true;
 }
 
 void
@@ -690,16 +707,16 @@ DemoAnalyzer::parseConfiguration(const edm::ParameterSet& iConfig)
         pdts_ = iConfig.getUntrackedParameter<std::vector<PdtEntry> >("particleTypes");
     }
     
-    particles_ = iConfig.getUntrackedParameter <std::string > ("particles");
-    if (iConfig.exists("bins_E") && iConfig.exists("bins_p"))
+    if (iConfig.exists("bins_p") && iConfig.exists("bins_E"))
     {	
-	edm::LogWarning("TooManyBins") << "default momentum bins will be used";
+	edm::LogWarning("TooManyBins") << "Only momentum bins will be used";
+	bins_test_ = iConfig.getUntrackedParameter <std::vector <double> >("bins_p");
     }
-    else if (iConfig.exists("bins_p"))
+    else if (iConfig.exists("bins_p") && !iConfig.exists("bins_E"))
     {
 	bins_test_ = iConfig.getUntrackedParameter <std::vector <double> >("bins_p");
     }
-    else if (iConfig.exists("bins_E"))
+    else if (!iConfig.exists("bins_p") && iConfig.exists("bins_E"))
     {
         bins_test_ = iConfig.getUntrackedParameter <std::vector <double> >("bins_E");
     }
@@ -710,10 +727,16 @@ DemoAnalyzer::parseConfiguration(const edm::ParameterSet& iConfig)
     if (iConfig.exists("TestParticleFilter"))
     {
     	particleFilter_ = iConfig.getParameter<edm::ParameterSet>("TestParticleFilter");
+	etaMin_ = particleFilter_.getParameter<double>("etaMin");
         etaMax_ = particleFilter_.getParameter<double>("etaMax");
 	pTMin_ = particleFilter_.getParameter<double>("pTMin");
+	pTMax_ = particleFilter_.getParameter<double>("pTMax");
+	pMin_ = particleFilter_.getParameter<double>("pMin");
+	pMax_ = particleFilter_.getParameter<double>("pMax");
 	EMin_ = particleFilter_.getParameter<double>("EMin");
-	pdgIdsToFilter_ = particleFilter_.getParameter<std::vector<int> >("IDs");
+	EMax_ = particleFilter_.getParameter<double>("EMax");
+	pdgIdsToFilter_ = particleFilter_.getParameter<std::vector<int> >("pdgIdsToFilter");
+	sort(pdgIdsToFilter_.begin(),pdgIdsToFilter_.end());
     }
 
     if (iConfig.exists("formating1D"))
@@ -732,14 +755,20 @@ DemoAnalyzer::parseConfiguration(const edm::ParameterSet& iConfig)
 void
 DemoAnalyzer::parseHistoFormating1D(const std::vector<edm::ParameterSet>& selectEventPSets)
 {
+    publishHistoFormating1DWarnings(selectEventPSets);
     for (unsigned int iname=0; iname< selectEventPSets.size(); ++iname)
     {
-        selectedProcessPaths_.title=selectEventPSets[iname].getParameter<std::string>("title");
-	selectedProcessPaths_.name=selectEventPSets[iname].getParameter<std::string>("name");
-	selectedProcessPaths_.labelx=selectEventPSets[iname].getUntrackedParameter<std::string>("labelx");
-	selectedProcessPaths_.labely=selectEventPSets[iname].getUntrackedParameter<std::string>("labely");
-	selectedProcessPaths_.rangex=selectEventPSets[iname].getUntrackedParameter<std::vector<double> >("rangex");
+        if(iname<bins_test_.size())
+	{
+	   selectedProcessPaths_.push_back(formating1D());
+	   selectedProcessPaths_[iname].title=selectEventPSets[iname].getParameter<std::string>("title");
+	   selectedProcessPaths_[iname].name=selectEventPSets[iname].getParameter<std::string>("name");
+	   selectedProcessPaths_[iname].labelx=selectEventPSets[iname].getUntrackedParameter<std::string>("labelx");
+	   selectedProcessPaths_[iname].labely=selectEventPSets[iname].getUntrackedParameter<std::string>("labely");
+	   selectedProcessPaths_[iname].rangex=selectEventPSets[iname].getUntrackedParameter<std::vector<double> >("rangex");
+	}
     }
+    
 }
 
 void
@@ -747,15 +776,94 @@ DemoAnalyzer::parseHistoFormating2D(const std::vector<edm::ParameterSet>& select
 {
     for (unsigned int iname=0; iname< selectEventPSets.size(); ++iname)
     {
-        selectedProcessPaths2_.title=selectEventPSets[iname].getParameter<std::string>("title");
-	selectedProcessPaths2_.name=selectEventPSets[iname].getParameter<std::string>("name");
-	selectedProcessPaths2_.labelx=selectEventPSets[iname].getUntrackedParameter<std::string>("labelx");
-	selectedProcessPaths2_.labely=selectEventPSets[iname].getUntrackedParameter<std::string>("labely");
-	selectedProcessPaths2_.rangex=selectEventPSets[iname].getUntrackedParameter<std::vector<double> >("rangex");
-	selectedProcessPaths2_.rangey=selectEventPSets[iname].getUntrackedParameter<std::vector<double> >("rangey");
+        selectedProcessPaths2_.push_back(formating2D());
+        selectedProcessPaths2_[iname].title=selectEventPSets[iname].getParameter<std::string>("title");
+	selectedProcessPaths2_[iname].name=selectEventPSets[iname].getParameter<std::string>("name");
+	selectedProcessPaths2_[iname].labelx=selectEventPSets[iname].getUntrackedParameter<std::string>("labelx");
+	selectedProcessPaths2_[iname].labely=selectEventPSets[iname].getUntrackedParameter<std::string>("labely");
+	selectedProcessPaths2_[iname].rangex=selectEventPSets[iname].getUntrackedParameter<std::vector<double> >("rangex");
+	selectedProcessPaths2_[iname].rangey=selectEventPSets[iname].getUntrackedParameter<std::vector<double> >("rangey");
+    }
+
+}
+
+
+void
+DemoAnalyzer::publishHistoFormating1DWarnings(const std::vector<edm::ParameterSet>&  selectEventPSets)
+{
+    if(selectEventPSets.size()>bins_test_.size()+1)
+    {
+	edm::LogWarning("TooMany1DHistograms") << "Number of reserved 1D Histos will be reduced to number of ! minus one";
     }
 }
 
+
+void
+DemoAnalyzer::publishParticleFilterWarnings()
+{
+    if (etaMin_== etaMax_)
+    {
+        edm::LogWarning("IdenticalFilterValues") << "Unique (min=max) pseudo-rapidity filter value will be used";
+    }
+    if (pTMin_== pTMax_)
+    {
+	if (pTMin_< std::numeric_limits<double>::epsilon())
+	{
+	    edm::LogWarning("DisabledFilterValues") << "No pT filter value will be applied";
+	    pTMin_ = -1.;
+	    pTMax_ = std::numeric_limits<double>::max();
+	}
+	else
+	{
+	    edm::LogWarning("IdenticalFilterValues") << "Unique (min=max) pT filter value will be used with machine tolerance";
+	    pTMin_ = pTMin_ - std::numeric_limits<double>::epsilon();
+	    pTMax_ = pTMax_ + std::numeric_limits<double>::epsilon();
+	}
+    }
+    if (pMin_== pMax_)
+    {
+        if (pMin_< std::numeric_limits<double>::epsilon())
+	{
+	    edm::LogWarning("DisabledFilterValues") << "No p (momentum) filter value will be applied";
+	    pMin_ = -1.;
+            pMax_ = std::numeric_limits<double>::max();
+	}
+        else
+	{
+	    edm::LogWarning("IdenticalFilterValues") << "Unique p (momentum) filter value will be used";
+	    pMin_ = pMin_ - std::numeric_limits<double>::epsilon();
+            pMax_ = pMax_ + std::numeric_limits<double>::epsilon();
+	}
+    }
+    if (EMin_== EMax_)
+    {
+        if (EMin_< std::numeric_limits<double>::epsilon())
+        {
+	    edm::LogWarning("DisabledFilterValues") << "No E (energy) filter value will be applied";
+	    EMin_ = -1.;
+            EMax_ = std::numeric_limits<double>::max();
+	}
+        else
+        {
+	    edm::LogWarning("IdenticalFilterValues") << "Unique E (energy) filter value will be used";
+	    EMin_ = pMin_ - std::numeric_limits<double>::epsilon();
+            EMax_ = pMax_ + std::numeric_limits<double>::epsilon();
+	}
+    }
+    
+    std::set<int> intersect;
+    std::set<int>::iterator it;
+    std::set_intersection(pdgIdsToSelect_.begin(), pdgIdsToSelect_.end(), pdgIdsToFilter_.begin(), pdgIdsToFilter_.end(), std::inserter(intersect,intersect.begin()));
+    if (intersect.size()!=0)
+    {
+	edm::LogWarning("IdenticalToFilterAndToSelectPDGValues") << "No PDGfilter can be applied for identical PDGselect values!";
+	for (it=intersect.begin(); it!=intersect.end(); ++it)
+	{
+	    pdgIdsToFilter_.erase(std::remove(pdgIdsToFilter_.begin(), pdgIdsToFilter_.end(), *it), pdgIdsToFilter_.end());
+	}
+    }
+    
+}
 
 //define this as a plug-in
 DEFINE_FWK_MODULE(DemoAnalyzer);
