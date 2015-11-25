@@ -1,7 +1,6 @@
 import FWCore.ParameterSet.Config as cms
 
 DQMExample_Step1 = cms.EDAnalyzer('DemoAnalyzer', 
-     processFastSim = cms.untracked.bool(False),
      SimHitTags = cms.VInputTag(
         cms.InputTag("famosSimHits", "TrackerHits")
         #cms.InputTag("g4SimHits", "TrackerHitsPixelBarrelLowTof"),
@@ -18,9 +17,14 @@ DQMExample_Step1 = cms.EDAnalyzer('DemoAnalyzer',
         #cms.InputTag("g4SimHits", "TrackerHitsTOBHighTof")
      ),
      #particles = cms.untracked.string('pions/'), #token(e.g. :) could be everything other a number, a letter and an underscore
-     particleTypes = cms.untracked.vint32(211),
+     TestParticleSelection = cms.PSet(
+        # Particles with |eta| > etaMax (momentum direction at primary vertex)
+        particleTypes = cms.untracked.vint32(211),
+        # Particles with |eta| > etaMax (momentum direction at primary vertex)
+        selectAntiParticle = cms.untracked.bool(True),
+     ),
      #bins_p =  cms.untracked.vdouble(2.1, 1.2, 3.4, .8, 5.2, .4),
-     bins_p =  cms.untracked.vdouble( 1.2, .4, 1.5, 1.9),
+     bins_E =  cms.untracked.vdouble( 1.2, .4, 1.5, 1.9, 2.1),
      TestParticleFilter = cms.PSet(
         # Particles with |eta| > etaMax (momentum direction at primary vertex)
         # are not simulated 
@@ -41,11 +45,13 @@ DQMExample_Step1 = cms.EDAnalyzer('DemoAnalyzer',
         # Particles with energy smaller than EMin (GeV) are not simulated
         EMax = cms.double(0.0),
         # Protons with energy in excess of this value (GeV) will kept no matter what
-        pdgIdsToFilter = cms.vint32(2212)
+        pdgIdsToFilter = cms.vint32(2212),
+        # Protons with energy in excess of this value (GeV) will kept no matter what
+        filterAntiParticle = cms.bool(True),
         ),
      formating1D = cms.VPSet (
         cms.PSet(
-         title = cms.string('mine'),
+         title = cms.string('test'),
          name = cms.string('default'),
          labelx = cms.untracked.string('dEdX'),
          labely = cms.untracked.string(''),
@@ -54,12 +60,12 @@ DQMExample_Step1 = cms.EDAnalyzer('DemoAnalyzer',
         ),
      formating2D = cms.VPSet (
         cms.PSet(
-         title = cms.string('default'),
+         title = cms.string('test'),
          name = cms.string('default'),
-         labelx = cms.untracked.string('p (#it{GeV}/c)'),
+         labelx = cms.untracked.string('p'),
          labely = cms.untracked.string('dEdX'),
-         rangex = cms.untracked.vdouble(60.,120.),
-         rangey = cms.untracked.vdouble(60.,120.),
+         rangex = cms.untracked.vdouble(60., 1., 100.),
+         rangey = cms.untracked.vdouble(200., 0., 1e-2),
          )
         ) 
  )                          

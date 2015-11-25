@@ -36,7 +36,7 @@ process.load("Analyzer.MaterialEffectsAnalyzer.DQMExample_Step1_cfi")
 
 
 process.maxEvents = cms.untracked.PSet(
-    input = cms.untracked.int32(500)
+    input = cms.untracked.int32(-1)
 )
 
 
